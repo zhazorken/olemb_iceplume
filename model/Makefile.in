@@ -1,0 +1,328 @@
+%
+%  $Id: Makefile.in,v 1.15 1999/07/15 19:00:17 dwd Exp $
+%
+% Makefile for olem models
+%
+% Model conditional compiliation flags
+%
+% NEWSOLVE   use mpi solver (mpi version only)
+% RADIATE    use radiation conditions
+% SNGLSALT   use single precsion salt (cray version)
+% NOPOISSON  use other code for pois3d and poistg (cray version)
+% ALLOC_DISK allocate all the disk space at the start of the run
+% MARSH_DEN  use rho=rho0(1+alpha(t0-t)) equation of state
+% ANALY      create analysis fields
+% DEBUG      include code for writing maximum pressure
+% TKESHEAR   remove domain average shear from tke generation calculation
+% CONSGRAD   constant gradient bottom B.C. for u and v
+% SUNOS      define for SUNOS 4.1.x compilation for proper signal definition
+% NDEBUG     debug turned off (Win32)
+% PRINTDEBUG turns on lots of print statements
+%
+% Choose at ONE of the following
+% 
+% LEVEQ      use leveq77.F for advection
+% LEER       use leer.F for advection
+%
+% These are options for Surface Wave Paramterization
+%
+% STOKES     use stokes drift vortex force
+% STOKESF    use stokes drift coriolis force (STOKES must be defined)
+% STOKES1    define stokes drift using random perturbation
+%
+% cray       Cray f77 environment
+% sun        Sun compiler f77
+% Win32      Microsoft Fortran Powerstation 1.0 (f77)
+% 
+#ifdef sunmpiMAKE
+CPP=/usr/ccs/lib/cpp
+FC=mpif77
+%
+% set model compilation options (lines should be <= 60 chars)
+%
+MODFLAGS1= -DUVWFLUX -DNEWSOLVE -DLEVEQ -DSTOKES -DSTOKESF
+MODFLAGS2= -DSNGLSALT -DUSEMPI -DANALY
+MODFLAGS3=
+%
+% set fortran compilation options
+%
+FFLAGS= -u -fast -O4
+MODFLAGS4=$(FFLAGS)
+%
+ROOT_DIR=/home/heron2/local
+LIBS= -L$(ROOT_DIR)/lib -lnetcdf -lfftw
+%
+% Common sun f77 switches:
+% -u         Undefined variables cause fatal error.
+% -g         Debug.
+% -fast      Fast execution. Optimize for speed.
+% -parallel  Automatic and explicit loop parallelizations.
+% -stackvar  Local variables are stored on the stack
+% -O4        Auto inline of functions.  Highest optimization.
+% -sb        Produce table information for SourceBrowser
+% -C         includes code for checking array bounds
+% -Usym      Undefine preprocessor symbol
+% -Dsym      Define preprocessor symbol
+%
+LNFLAGS=
+CPPFLAGS= $(MODFLAGS1) $(MODFLAGS2) $(MODFLAGS3) -I$(ROOT_DIR)/include -I$(ROOT_DIR)/mpi/include
+#endif
+#ifdef sunMAKE
+CPP=/usr/ccs/lib/cpp
+FC=f77
+%
+% set model compilation options (lines should be <= 60 chars)
+%
+MODFLAGS1= -DUVWFLUX -DLEVEQ -DSTOKES -DSTOKESF
+MODFLAGS2= -DSNGLSALT -DANALY
+MODFLAGS3=
+%
+% set fortran compilation options
+%
+FFLAGS= -u -fast -O4
+MODFLAGS4=$(FFLAGS)
+%
+ROOT_DIR=/home/heron2/local
+LIBS= -L$(ROOT_DIR)/lib -lnetcdf
+%
+% Common sun f77 switches:
+% -u         Undefined variables cause fatal error.
+% -g         Debug.
+% -fast      Fast execution. Optimize for speed.
+% -parallel  Automatic and explicit loop parallelizations.
+% -stackvar  Local variables are stored on the stack
+% -O4        Auto inline of functions.  Highest optimization.
+% -sb        Produce table information for SourceBrowser
+% -C         includes code for checking array bounds
+% -Usym      Undefine preprocessor symbol
+% -Dsym      Define preprocessor symbol
+%
+LNFLAGS=
+CPPFLAGS= $(MODFLAGS1) $(MODFLAGS2) $(MODFLAGS3) -I$(ROOT_DIR)/include
+#endif
+#ifdef sgiMAKE
+NCDIR=/usr/people/ddenbo
+CPP=cc -E
+FC=f77
+%
+% set model compilation options (lines should be <= 60 chars)
+%
+MODFLAGS1= -DLEER -DUVWFLUX -DSTOKES -DSTOKESF
+MODFLAGS2= -DANALY
+MODFLAGS3=
+%
+% set fortran compilation options
+%
+% for R5000 machines
+%
+FFLAGS= -Dsgi -u -mips4 -static -Ofast -r5000
+%
+% for R10000 machines
+%
+FFLAGS= -Dsgi -u -mips4 -Ofast=ip27 -r10000 -n32
+MODFLAGS4=$(FFLAGS)
+%
+LIBS= -L$(NCDIR)/lib -lnetcdf
+%
+% Common sgi f77 switches:
+% -u         Undefined variables cause fatal error.
+% -g         Debug.
+% -mips3     R4000
+% -mips4     R10000, R8000, R5000
+% -n32       default for -mips4 and R5000, and -mips3
+% -64        default for -mips4 and R8000
+% -mp        enable multiprocessing features
+% -static    causes all local variables to be static
+% -O2        Turn on extensive optimization.
+% -O3        Turn on aggressive optimization.
+% -Ofast     Fastest optimaization for platform.  -Ofast=ipxx
+%            stommel ip27, pritchard ip32
+% -r5000     Schedule code for R5000
+% -r10000    Schedule code for R10000
+% -C         includes code for checking array bounds
+% -Usym      Undefine preprocessor symbol
+% -Dsym      Define preprocessor symbol
+%
+LNFLAGS=
+CPPFLAGS= $(MODFLAGS1) $(MODFLAGS2) $(MODFLAGS3) -I$(NCDIR)/include
+
+CRAYFLAGS = -Usun -Dcray -DSNGLSALT -DALLOC_DISK
+#endif
+#ifdef win32MAKE
+%
+% CFG=Release (optimized), Debug (Debug version)
+%
+CFG=Release
+
+CPP=
+FC=f90
+CC=cl
+LINK=link
+%
+% param.make contains stack size computed from make_param
+%
+.INCLUDE: "param.make"
+%
+% set model compilation options (lines should be <= 60 chars)
+%
+BASE_MODFLAGS = /D "LEER" /D "UVWFLUX" /D "STOKES" /D "STOKESF"
+.IF $(CFG) == Release
+MODFLAGS1= $(BASE_MODFLAGS) /D "NDEBUG"
+.ELSE
+MODFLAGS1= $(BASE_MODFLAGS)
+.END
+MODFLAGS2= /D "ANALY" /D "Win32"
+MODFLAGS3=
+%
+% set fortran compilation options
+%
+BASE_FFLAGS= /4Ya /4Yd /nologo
+.IF $(CFG) == Release
+	FFLAGS = $(BASE_FFLAGS) /Ox /Ob2
+.ELSE
+	FFLAGS = $(BASE_FFLAGS) /Zi /4Yd
+.END
+MODFLAGS4=$(FFLAGS)
+%
+LIBS=kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib \
+     advapi32.lib shell32.lib wsock32.lib ole32.lib oleaut32.lib \
+     uuid.lib odbc32.lib odbccp32.lib \
+     /LIBPATH:"C:\\local\\lib" netcdf.lib
+%
+% Common microsoft fortran switches:
+% /Ox       Enables speed optimization and denoted inlining
+% /Ob2      Enables auto inlining
+% /Op       Enables improved floating-point consistency
+% /4{N|Y}d  Controls warnings about undefined variables
+% /4Nf      Disables Fortran 90 free-form source code formatting
+% /4{N|Y}a  Disables/Enables automatic storage (default /4Na = static)
+% /4{N|Y}b  Controls bounds checking
+% /Zi       Produce .obj with symbolic debugging information
+% /c        Suppresses linking of compiled objects
+% /nologo   Suppresses the copyright message
+% /W0       Suppresses warning messages
+% /I "dir"  Adds and include path
+% /Fo"dir"  Names the object
+% /D "sym"  Defines symbol with metacommands
+% /STACK:reserve,commit  Set the size of the stack (LINK option)
+%                        reserve = stack allocation
+%                        commit  = memory to allocate at a time
+%                        reserve = 120*idim*jdim*kdim
+%
+LNFLAGS= /nologo /subsystem:console /incremental:no /machine:I386 \
+     /out:"olem.exe" /nodefaultlib:library
+
+CPPFLAGS= $(MODFLAGS1) $(MODFLAGS2) $(MODFLAGS3) /I"C:\local\include"
+#endif
+#ifdef exemplarMAKE
+CPP=/opt/langtools/lbin/cpp
+FC=mpif77
+%
+% set model compilation options (lines should be <= 60 chars)
+%
+MODFLAGS1= -DUVWFLUX -DNEWSOLVE -DLEVEQ -DSTOKES -DSTOKESF
+MODFLAGS2= -DSNGLSALT -DUSEMPI -Dhp -DANALY
+MODFLAGS3=
+%
+% set fortran compilation options
+%
+FFLAGS = -u +O3 +DA2.0N +DS2.0a +U77 +FPD
+MODFLAGS4=$(FFLAGS)
+%
+FFTW_DIR = /home/dwd
+LIBS= /usr/local/lib/libnetcdf.a $(FFTW_DIR)/libfftw.a
+LDOPTS= +vnocompatwarnings
+%
+% Common hp f77 switches:
+% -u       Identifiers must be explicitly declared
+% +O3      Optimization level 3
+% +DA2.0N  Generate code for PA-RISC version 2.0N
+% +DS2.0a  Perform instruction scheduling for PA-RISC version 2.0a
+% +U77     Invoke support for the BSD 3F library
+% +FPD     Floating Point underflows set to zero (ld flag)
+% -Q       Prevent linker output being marked "demand load"
+% -g       Generate debugging information
+%
+LNFLAGS=
+CPPFLAGS= $(MODFLAGS1) $(MODFLAGS2) $(MODFLAGS3) -I/usr/local/include -I/opt/local/mpi/include
+#endif
+
+SOURCES = bc_read.F bc_update.F bcinit.F cycelim.F dag_create.F \
+          dag_write.F date.F deardorff.F deltime.F density.F \
+          denupdte.F filter.F fld_create.F fld_write.F flt_update.F \
+          flt_create.F flt_read.F flt_write.F fmetais.F \
+          hostnme.F ic_read.F icemod.F icinit.F ies80.F imag.F \
+          image.F in_read.F indexx.F initrad.F intg.F \
+          leer.F leerdp.F leveq2d.F leveq77.F leveq77dp.F lnblk.F \
+          loop3d.F mks.F myhandler.F olem.F olem_init.F \
+          parse.F poisson.F radbc.F ran2.F restart.F \
+          sig_handler.F slb_create.F \
+          slb_write.F smag.F topbotb.F topbotdp.F unix.F \
+          upper.F uvwflux.F varcde.F wrparm.F zmixed.F
+
+MPI_SOURCES = global.F iompi.F poislk.F setupmpi.F shifts.F transpose.F 
+
+#if defined(exemplarMAKE) || defined(sunmpiMAKE)
+ALL_SOURCES = $(SOURCES) $(MPI_SOURCES)
+#else
+ALL_SOURCES = $(SOURCES)
+#endif
+
+OBJECTS= $(ALL_SOURCES:.F=.o)
+
+.KEEP_STATE:
+
+#ifdef exemplarMAKE
+.SUFFIXES: .F
+
+.F.o:
+	$(FC) $(FFLAGS) $(CPPFLAGS) -c $<
+#endif
+
+#ifndef win32MAKE
+olem: info $(OBJECTS)
+	$(FC) $(LNFLAGS) $(FFLAGS) -o olem *.o $(LIBS) 
+olem.o: olem.F
+	@sed -e "s;MODEL_FLAGS1;$(MODFLAGS1);" olem.F | \
+	sed -e "s;MODEL_FLAGS2;$(MODFLAGS2);" | \
+	sed -e "s;MODEL_FLAGS3;$(MODFLAGS3);" | \
+	sed -e "s;MODEL_FLAGS4;$(MODFLAGS4);" > foo.F
+	$(FC) $(FFLAGS) $(CPPFLAGS) -c foo.F
+	@mv foo.o olem.o
+#endif
+#ifdef win32MAKE
+olem debug-olem: info $(OBJECTS)
+	$(LINK) $(LNFLAGS) *.o $(LIBS) /STACK:$(STACK_SIZE)
+  
+olem.o: olem.F
+	@$(CC) /nologo /C /EP $(CPPFLAGS) $^ > $*.tmp
+	@sed -e "s;MODEL_FLAGS1;$(MODFLAGS1);" $*.tmp | \
+	sed -e "s;MODEL_FLAGS2;$(MODFLAGS2);" | \
+	sed -e "s;MODEL_FLAGS3;$(MODFLAGS3);" | \
+	sed -e "s;MODEL_FLAGS4;$(MODFLAGS4);" > $*.for
+	rm -f $*.tmp
+	@$(FC) $(CPPFLAGS) $(BASE_FFLAGS) /c olem.for
+	@mv $*.obj $*.o
+#endif
+
+PHAKE:
+
+clean:
+	-@rm -f .sb/Locked/\*
+	-@rm -f .sb/NewRoot/\*
+	-@rm -f .sb/OldRoot/\*
+	-@rm -f .sb/Refd/\*
+	-@rm -f .sb/Index
+	rm -f foo.F *~ *.o *.for *.s *.lst .make.state .nse_depinfo
+
+check:
+	cvscheck
+
+info:
+	@head -3 param.inc
+	@echo " "
+	@echo "  model flags: $(MODFLAGS1)"
+	@echo "  model flags: $(MODFLAGS2)"
+	@echo "  model flags: $(MODFLAGS3)"
+	@echo "fortran flags: $(MODFLAGS4)"
+	@echo " "

@@ -1,0 +1,16 @@
+c
+c   $Id: finitv.inc,v 1.2 1999/08/16 20:22:31 eds Exp $
+c
+c
+c volume and cell boundary areas
+c
+      real ax(0:idim1,0:jdim1,0:kdim1)
+      real ay(0:idim1,0:jdim1,0:kdim1)
+      real vay(0:idim1,0:jdim1,0:kdim1)
+      real way(0:idim1,0:jdim1,0:kdim1)
+      real bay(0:idim1,0:jdim1,0:kdim1)
+      real frac(0:idim1,0:jdim1)
+      real harea(0:idim1,0:jdim1)
+      integer kdist(0:idim1,0:jdim1)
+
+      common/finitv/ax,vay,ay,bay,way,frac,harea,kdist

@@ -1,0 +1,50 @@
+c
+c   $Id: olemf.inc.in,v 1.4 1999/08/16 20:29:26 eds Exp $
+c
+c     u     = horizontal velocity field 1
+c     v     = horizontal velocity field 2
+c     w     = vertical velocity field
+c     p     = pert. pressure field
+c     th    = temperature field
+c     sal   = salinity field
+c
+      real u(0:idim1,0:jdim1,0:kdim1),um(0:idim1,0:jdim1,0:kdim1)
+      real umm(0:idim1,0:jdim1,0:kdim1)
+      real v(0:idim1,0:jdim1,0:kdim1),vm(0:idim1,0:jdim1,0:kdim1)
+      real vmm(0:idim1,0:jdim1,0:kdim1)
+      real w(0:idim1,0:jdim1,0:kdim1),wm(0:idim1,0:jdim1,0:kdim1)
+      real wmm(0:idim1,0:jdim1,0:kdim1)
+c
+      real p(0:idim1,0:jdim1,0:kdim1)
+      real th(0:idim1,0:jdim1,0:kdim1),thp(0:idim1,0:jdim1,0:kdim1)
+#if defined(SNGLSALT)
+      real sal(0:idim1,0:jdim1,0:kdim1),salp(0:idim1,0:jdim1,0:kdim1)
+#else
+      real*8 sal(0:idim1,0:jdim1,0:kdim1),salp(0:idim1,0:jdim1,0:kdim1)
+#endif
+      real tke(0:idim1,0:jdim1,0:kdim1),tkep(0:idim1,0:jdim1,0:kdim1)
+      real trc(0:idim1,0:jdim1,0:kdim1,trcdim)
+      real trcp(0:idim1,0:jdim1,0:kdim1)
+      real rhop(0:idim1,0:jdim1,0:kdim1),rhob(0:kdim1),rhobm1(0:kdim1)
+      real rho0
+      real fluxvd(0:idim1,0:kdim1),fluxv0(0:idim1,0:kdim1)
+      real fluxv1(0:idim1,0:kdim1)
+#if defined(ANALY)
+      real*8 p_ave(kdim),a_ave(kdim),b_ave(kdim),sg_ave(kdim)
+      real*8 sd_ave(kdim),uf_ave(kdim)
+      real u_bar(kdim),v_bar(kdim)
+      real*8 vf_ave(kdim),wf_ave(kdim),u2_ave(kdim),v2_ave(kdim)
+      real*8 w2_ave(kdim1),tke_ave(kdim),disp_ave(kdim)
+      real*8 dpea(kdim),dpesg(kdim),pen(kdim),peo(kdim)
+#endif
+c
+      common/comuvw/ u,um,umm,w,wm,wmm,v,vm,vmm
+      common/comt/  p,th,thp,sal,salp,trc,trcp
+      common/comq/ tke,tkep
+      common/comrho/ rhop,rhob,rhobm1,rho0
+      common/comflx/fluxvd,fluxv0,fluxv1
+#if defined(ANALY)
+      common/analy/p_ave,a_ave,b_ave,sg_ave,sd_ave,uf_ave,vf_ave,
+     $             wf_ave,u_bar,v_bar,u2_ave,v2_ave,w2_ave,
+     $             dpesg,dpea,pen,peo,tke_ave,disp_ave
+#endif
