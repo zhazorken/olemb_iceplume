@@ -1,3 +1,0 @@
-%.o: %.F;	@$(CC) /nologo /C /EP $(CPPFLAGS) $^ > $*.for
-		@$(FC) $(CPPFLAGS) $(FFLAGS) /c $*.for
-		@mv $*.obj $*.o
