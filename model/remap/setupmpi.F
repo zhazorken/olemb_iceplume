@@ -1,0 +1,211 @@
+      subroutine setupmpi
+c
+c  $Id: setupmpi.F,v 1.7 1998/10/21 21:56:41 dwd Exp $
+c
+
+      include 'mpif.h'
+#include "param.inc"
+#include "olemp.inc"
+#include "communicate.inc"
+#include "fftw_f77_param.h"
+
+      
+      integer dims(1),coords(1)
+
+      integer j,ierr,np,ik2dim,ncord
+      integer j_global(jtotal)
+      integer numblock,blocklen,stride,ndims
+      logical periods(1), reorder
+c
+c Initiate MPI
+c
+c      call MPI_INIT(ierr)
+c
+#if defined(PRINTDEBUG)
+      write(*,*)"Set up MPI"
+#endif
+      ndims = 1
+      dims(1) = nprocs
+      periods(1) = .true.
+      reorder = .true.
+      mpitag_nshift = 1
+      mpitag_sshift = 2
+      mastertask = 0
+
+      call MPI_CART_CREATE(MPI_COMM_WORLD, ndims, dims, periods,
+     &                     reorder, comm, ierr)
+c
+c compute shifts for north and south
+c
+      call MPI_CART_SHIFT(comm,0,1,nbr_south,nbr_north,ierr)
+c
+c get the process number
+c
+      call MPI_COMM_RANK(comm,my_pe,ierr)
+c
+c get the local cartesian group relative to my_pe (probably = my_pe)
+c
+      call MPI_CART_COORDS(comm,my_pe,1,coords,ierr)
+#if defined(PRINTDEBUG)
+      write(*,*)"Coords created ",my_pe
+#endif
+c
+c set flag for master task part of program
+c
+      if(my_pe.eq.mastertask) then
+        iope = .true.
+      else
+        iope = .false.
+      endif
+c
+c setup plan for fft used in poislk
+c
+c mark csmith top - have commented out fftw_f77 stuff
+c      call fftw_f77_create_plan(iplan,idim,FFTW_BACKWARD,
+c     &    FFTW_ESTIMATE)
+c      call fftw_f77_create_plan(rfplan,idim,FFTW_FORWARD,
+c     &    FFTW_ESTIMATE)
+c      call fftw_f77_create_plan(jplan,jtotal,FFTW_BACKWARD,
+c     &    FFTW_ESTIMATE)
+c mark csmith bottom
+
+
+c
+c      call fftw2d_f77_mpi_create_plan
+c     &   (comm,iplan,idim,jtotal,FFTW_BACKWARD,
+c     &    FFTW_ESTIMATE)
+c
+c set up plans for radiative b.c. routine
+c
+c      call fftw2d_f77_mpi_create_plan
+c     &   (comm,rfplan,idim,jtotal,FFTW_FORWARD,
+c     &    FFTW_ESTIMATE)
+c
+c      call fftw2d_f77_mpi_create_plan
+c     &   (comm,rbplan,idim,jtotal,FFTW_BACKWARD,
+c     &    FFTW_ESTIMATE)
+#if defined(PRINTDEBUG)
+      write(*,*)"Done with fft plan setup"
+#endif
+c
+c
+c set up data blocks, assume fortran ordering with row changing fastest
+c for example, for 32 x 32 array, divide into 32 x 8 chunks.  j_global
+c has the beginning, zero-based cartesian coordinate for each processor.
+c jdim is the local maximum coordinate defined as jtotal/NPROC. j_global is
+c used for i/o functions and does not consider the ghost points 
+c
+      do j=1,jdim
+        j_global(j) = jdim*coords(1) + j 
+      enddo
+c
+c figure out block starting address (basically an offset)
+c and broadcast to each node
+c
+      do np=1,nprocs
+        if(np-1.eq.my_pe) then
+           j = j_global(1)
+           ncord = coords(1)
+#if defined(PRINTDEBUG)
+           write(*,*)"processor # ",my_pe," block start ",j
+#endif
+        endif
+        call broadcast_scalar_int(j,np-1)
+        call broadcast_scalar_int(ncord,np-1)
+        call MPI_barrier(comm, ierr)
+        blockstart(np) = j
+        blockcord(np) = ncord
+      enddo
+
+c
+c define type for boundary communication
+c
+
+      numblock = kdim+2
+      blocklen = idim+2
+      stride = (jdim+2)*(idim+2)
+     
+      call MPI_TYPE_VECTOR(numblock,blocklen,stride,
+     &                     MPI_REAL,ns_type_real,ierr)
+c
+      call MPI_TYPE_COMMIT(ns_type_real,ierr)
+c
+#if !defined(SNGLSALT)
+      call MPI_TYPE_VECTOR(numblock,blocklen,stride,
+     &                     MPI_DOUBLE_PRECISION,ns_type_double,ierr)
+c
+      call MPI_TYPE_COMMIT(ns_type_double,ierr)
+#endif
+c
+c boundary from full 3-d array
+c
+      stride = (jtotal+2)*(idim+2)
+    
+      call MPI_TYPE_VECTOR(numblock,blocklen,stride,
+     &                     MPI_REAL,nst_type_real,ierr)
+c
+      call MPI_TYPE_COMMIT(nst_type_real,ierr)
+
+c
+c define type for io operations
+c
+c These are needed because the global arrays are divided along the 
+c j axis, which is not the fastest varying dimension in memory. To get
+c around this, we define two datatype: the local is just a contiguous
+c data chunk with kdim+2 slabs of (idim+2)*(jdim+2) size, the global
+c has the same slab size, but has a stride of jtotal+2 to account for
+c the offset between k levels in the global array
+c
+      blocklen = idim2*jdim
+      stride = jdim2*idim2
+c
+      call MPI_TYPE_VECTOR(numblock,blocklen,stride,
+     &                     MPI_REAL,mpi_local_real, ierr)
+      call MPI_TYPE_COMMIT(mpi_local_real,ierr)
+c
+#if !defined(SNGLSALT)
+      call MPI_TYPE_VECTOR(numblock,blocklen,stride,
+     &              MPI_DOUBLE_PRECISION,mpi_local_double, ierr)
+      call MPI_TYPE_COMMIT(mpi_local_double,ierr)
+#endif
+c
+      stride = idim2*(jtotal+2)
+      call MPI_TYPE_VECTOR(numblock,blocklen,stride, 
+     &                     MPI_REAL,mpi_global_real, ierr) 
+      call MPI_TYPE_COMMIT(mpi_global_real,ierr)
+c
+#if !defined(SNGLSALT)
+      call MPI_TYPE_VECTOR(numblock,blocklen,stride, 
+     &              MPI_DOUBLE_PRECISION,mpi_global_double, ierr) 
+      call MPI_TYPE_COMMIT(mpi_global_double,ierr)
+#endif
+c
+c define type for a xz cross section slab
+c
+      numblock=kdim2*jdim2
+      blocklen = 1
+      stride = idim2
+      call MPI_TYPE_VECTOR(numblock,blocklen,stride,
+     &                     MPI_REAL,mpi_local_xz, ierr)
+      call MPI_TYPE_COMMIT(mpi_local_xz,ierr)
+c
+#if !defined(SNGLSALT)
+      call MPI_TYPE_VECTOR(numblock,blocklen,stride,
+     &     MPI_DOUBLE_PRECISION,mpi_local_double_xz, ierr)
+      call MPI_TYPE_COMMIT(mpi_local_double_xz,ierr)
+#endif
+c
+c define type for contiguous data array 
+c
+      ik2dim = (kdim+2)*(idim+2)
+      call MPI_TYPE_CONTIGUOUS(ik2dim,MPI_REAL,nscont_type_real,ierr)
+      call MPI_TYPE_COMMIT(nscont_type_real,ierr)
+c
+#if !defined(SNGLSALT)
+      call MPI_TYPE_CONTIGUOUS(ik2dim,MPI_DOUBLE_PRECISION,
+     &     nscont_type_double,ierr)
+      call MPI_TYPE_COMMIT(nscont_type_double,ierr)
+#endif
+c
+      return
+      end
