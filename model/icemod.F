@@ -1,0 +1,832 @@
+      subroutine icemod(nn,nerr)
+c
+#if defined(USEMPI)
+      include 'mpif.h'
+#endif
+#include "param.inc"
+#include "olemf.inc"
+#include "olemp.inc"
+#include "cyclic.inc"
+#include "olemtke.inc"
+#include "ice.inc"
+#include "finitv.inc"
+#include "communicate.inc"
+c
+c Ice model derived from the Cox and Weeks model with modifications from
+c McPhee 1983-87 to account for reduced melting because of molecular
+c effects
+c
+c for now, assume ice layers have thickness of 0.005 m for heat internal
+c ice thermodynamics.  However, keep an ice thickness value to track
+c budgets of total heat and salt
+c
+c loop over horizontal domain first (memory order is different than other
+c field variables
+c
+      real nu,kw,lh,rhoice,radius,lfi,lfw,lfs,fzr0,kms,m,uc,tau
+      real cice,koni,konb,fice,ftop,tflux,tfluxp,tfluxm,tfreez
+      real ticea,depos,velfun,qfr,znot,wc,wrise
+      real a,b,c,deptho,phiturb,phiheat,phisal,c2,coef,sw,wice
+      real lfusion,deldepth,re,rtn,hcoef,rhoair,cpa,cs,wind
+      real f,df,dxx,t0,tair,flat,flong,epsig,xacc,kond,dfrz
+      real tf,zlev,saltflux,ks,hsnow,idelt,dss,heatflux,dthdz
+      real hicep(0:idim1,0:jdim1)
+      real ticep(0:idim1,0:jdim1)
+      real sicep(0:idim1,0:jdim1),uitemp(idim,jdim)
+      real statx,xdif,t1,t2,ths(kdim),sals(kdim),wms(kdim),ums(kdim)
+      real vms(kdim),r,til,zot,zos,tw,odepth,dels,ch,atg,filt
+      integer ki,icelevs,i,j,k,olev,iter,nerr
+      integer nn,ni,interval,ltime,kd,kk
+      integer is,js,i1,i2,ist,staunit
+      integer stx,endx,nfilt
+      real phi(0:idim1,0:jtotal1)
+      logical iceheat,lead,statxoff,first
+      save statx,statxoff,first
+      data statx/0.0/
+      data statxoff/.true./
+      data first/.true./
+#include "moddef.inc"
+c
+c define constants (move to olem.F later)
+c
+c ltime is the time in seconds to turn on the lead
+c
+c       ltime = 36000
+c      ltime = 18000
+c      ltime = 10800
+c       ltime = 86400.
+c       lead = .false.
+      ltime = 6.0
+      lead = .true.
+      js = 1 
+c      uice = 0.09
+      cice = 2009.
+      nu = 6.0
+      kw = 0.564
+      lfusion = 3.34e5
+      lh = lfusion/cp
+      rhoice = 920.
+c      radius = 0.002
+c      radius = 0.0007
+      radius = 0.001
+      lfi = radius*lfusion*rhoice
+      lfw = radius*cp
+      lfs = radius*lfusion
+      fzr0 = 1.0e-9
+      kms = 7.4e-10
+      m = 0.054
+      rhoair = 1.3
+      cpa = 1006
+      cs = 0.003
+c      uistar = 0.02
+      znot = 0.005
+      dthdz = atg(sal(1,1,kdim),th(1,1,kdim),0)
+c
+c smooth out the roughness length
+c
+      do nfilt = 1,6
+        do j=1,jdim
+          do i=1,idim
+            filt = uistar(i+1,j) -4.*uistar(i,j)+uistar(i-1,j)
+     *        +uistar(i,j-1)+uistar(i,j+1)
+            uitemp(i,j) = uistar(i,j)+0.06*filt
+            if(i.eq.2.and.j.eq.5.and.my_pe.eq.4) write(*,*)"filt ",filt
+          enddo
+        enddo
+        do j=1,jdim
+          do i=1,idim
+            uistar(i,j) = uitemp(i,j)
+          enddo
+        enddo
+        call imag2d(uistar)
+      enddo
+c
+c tau is used to compute wind speed
+c
+      tau = sqrt(ustr*ustr+vstr*vstr)
+      if(tau.eq.0.0) then
+        tau = 0.1
+      endif
+      tau = 0.05
+      wind = sqrt(tau*714/1.3)
+c
+c set the air temperature
+c
+      tair = 248.
+#if defined(WARMICE)
+      tair = 278.
+#endif
+      epsig = 5.67e-8
+      xacc = 0.1
+c      wrise = 0.0042
+c      wrise = 0.00086
+      wrise = 0.0016
+      iceheat = .true.
+      ks = 0.31
+      hsnow = 0.25
+      if(first.and.iope) then
+        write(lunit,*)"Ice model Parameters: radius,wrise,uice,hsnow"
+        write(lunit,*)radius,wrise,uice,hsnow
+        first = .false.
+      endif
+      if(nn*delt.lt.ltime) then
+c
+c station location in the x direction
+c
+        statx = 0.0
+      endif
+c
+c if no lead, then zero out the tmask
+c
+      lfton = .true.
+      if(ltime.lt.int(nn*delt)) then
+        do i=1,idim
+          do j=1,jdim
+            lf_tmask(i,j) = 0.0
+          enddo
+        enddo
+        call imag2d(lf_tmask)
+      endif
+          
+      if(.not.lead) then
+        lfton = .true.
+        hfton = .true.
+        strton = .false.
+        do i=1,idim
+          do j=1,jdim
+            hf_tmask(i,j)=0.0
+            lf_tmask(i,j)=0.0
+          enddo
+        enddo
+        call imag2d(hf_tmask)
+        call imag2d(lf_tmask)
+      endif
+c      if(lead.and.ltime.eq.int(nn*delt)) then
+c
+c initialize 50 point square lead
+c
+c        write(*,*)"Initialize lead "
+c        stx = idim/2 - 25
+c        endx = idim/2 + 25
+c        do j=0,jtotal1
+c          do i=0,idim1
+c            phi(i,j) = 0.0
+c            if((i.ge.stx).and.(i.le.endx)) then
+c             if((j.ge.stx).and.(j.le.endx)) then
+c                phi(i,j) = 1.0
+c             endif
+c            endif
+c          enddo
+c        enddo
+c#if defined(USEMPI)
+c        call distrib_2d(hf_tmask,phi)
+c#else
+c        do j=0,jdim1
+c          do i=0,idim1
+c            hf_tmask(i,j) = phi(i,j)
+c          enddo
+c        enddo
+c#endif
+c        call imag2d(hf_tmask)
+c      endif
+c
+c
+      interval = 1
+c
+c      if(nn.eq.1) then
+c
+c put random perturbation on ice thickness and compute volumes
+c and flux areas
+c
+c          do i=1,idim
+c            do j=1,jdim
+c              hice(i,j) = hice(i,j)*(1.0-(1.0-randn(i,j))*4.0)
+c            enddo
+c          enddo
+c      endif
+
+c
+c set i location of station when ice is turned on and open ascii output file
+c
+      if(int(nn*delt).ge.ltime.and.my_pe.lt.6.and.statxoff) then
+        if(lead) then
+          do i = 1, idim
+            if(hf_tmask(i,js).ne.0) then
+              is = i-1
+              statx = (is-1)*dx - 3.0
+              goto 444
+            endif
+          enddo
+        else
+          is = 241
+          statx = (is-1)*dx
+        endif
+ 444    continue
+        statxoff = .false.
+      endif
+c
+#if !defined(WARMICE)
+      if(int(nn*delt).eq.ltime.and.lead)then
+        write(*,*)"Setting ice thickness"
+        do j=1,jdim
+          do i=1,idim
+            if(hf_tmask(i,j).ne.0) then
+c
+c default lead ice thickness and temperature
+c
+              tice(i,j) = -1.5
+              hice(i,j) = 0.08
+           endif
+          enddo
+        enddo
+        call imag2d(hice)
+        call voltop(hice)
+      endif
+#endif
+c
+c
+      hcoef = rhoair*cpa*cs*wind
+c
+      do j=1,jdim
+        do i=1,idim
+c 
+c if thin ice then assume it's new and set higher salinity
+c not used for warm season ice
+c
+#if !defined(WARMICE)
+          if(hice(i,j).lt.0.10) then
+            sice(i,j) = 16.0
+          else
+            sice(i,j) = 4.0
+          endif
+#endif
+          flong = heatf*randn(i,j)
+          flat = latent*randn(i,j)*hf_tmask(i,j)
+          if(lead) then
+            if(hice(i,j).gt.0.0) then
+               iceheat = .true.
+            else
+               iceheat = .false.
+            endif
+          else
+            iceheat = .true.
+          endif
+c
+c cool the water if not ice covered
+c
+          zlev = 0.5*dz
+          tfreez = -0.054*sal(i,j,kdim)
+          t0 = tfreez+273.
+#if defined(WARMICE)
+          t0 = th(i,j,kdim)
+#endif
+          if(.not.iceheat) then
+            if(mod(nn,int(6./delt)).eq.0) then
+              if(swheatf.gt.0.0) then
+                do kk=1,kdim
+                   th(i,j,kk)=th(i,j,kk)+
+     *                  6.*swheatf*rad(kk)/(cp*
+     *                  rho0*dz)
+                enddo
+              endif
+              th(i,j,kdim)=th(i,j,kdim)+
+     *             6.*heatf*randn(i,j)/(cp*rho0*dz)
+              th(i,j,kdim1) = th(i,j,kdim)
+c
+c add in surface melt water of 1 cm per day with lead coverage
+c of 5% (19 parts for 1 part lead)
+c take half of that to account for melt ponds
+c
+              sal(i,j,kdim) = sal(i,j,kdim)-0.01*delt*odz*
+     *                        19.*6.*sal(i,j,kdim)/86400.
+c     *                        0.5*19.*6.*sal(i,j,kdim)/86400.
+              sal(i,j,kdim1) = sal(i,j,kdim)
+c
+            endif
+
+c            ftop = flong+hcoef*(tair-t0)-epsig*t0**4+flat
+c            th(i,j,kdim) = th(i,j,kdim) + ftop*delt/(cp*dz*rhob(kdim))
+c            fice = ftop/(cp*rhob(kdim))
+          endif
+c
+c compute the first level not completely frozen
+c make sure first model point is at least 80 % water.
+c
+c          kdist = int(hice(i,j)/dz)
+c          frac = hice(i,j)/dz - kdist
+c#if defined(WARMICE)
+c          if(frac.gt.0.8) then
+c#else
+c          if(frac.gt.0.4) then
+c#endif
+c              olev = kdim-kdist-1
+c              deldepth = dz + (1.-frac)*dz
+c          else
+c              olev = kdim-kdist
+c              deldepth = (1. - frac)*dz
+c          endif
+c          deptho = (kdim-olev)*dz + 0.5*dz
+c          odepth = (deptho-hice(i,j))
+c          deldepth = (deptho-hice(i,j))+0.5*dz
+c
+c try simple boundary box
+c
+          olev = kdist(i,j)
+          deptho = (kdim-olev)*dz + 0.5*dz
+          odepth = 0.5*dz
+          deldepth = dz
+c
+c the next section does the frazil ice calculation and is not needed for
+c the warm season case
+c
+#if !defined(WARMICE)
+c
+c
+c Check to see if T(z) is below freezing
+c in any of the top frazil ice levels 
+c if it is, then increase frazil ice concentration according to Omstedt
+c and Svensson (1984). The ice concentration is continously increased by
+c a constant small flux at the surface
+c 
+          do k=olev,1,-1
+            zlev = (kdim-k)*dz
+c            tfreez = -0.054*sal(i,j,k)
+            tfreez = -0.054*sal(i,j,k) - 7.53e-4*zlev
+c
+c
+c set cfr to minimum concentration of 1e-7 when temp below freezing
+c if temp above freezing and conc. lt. 0.0, set to 0.0
+c
+            dfrz = tfreez-th(i,j,k)
+            if(dfrz.gt.0.0) then
+              if(cfr(i,j,k).lt.1.0e-7)then
+                cfr(i,j,k) = 1.0e-7
+              endif
+            else if(cfr(i,j,k).lt.1e-10.and.dfrz.lt.0.0) then
+              cfr(i,j,k) = 0.0
+            endif
+            qfr = nu*kw*dfrz/(0.01*radius)
+c            qfr = nu*kw*dfrz/(2.*radius)
+            cfr(i,j,k) = cfr(i,j,k) 
+     *                + 2.*delt*cfr(i,j,k)*qfr/lfi
+c     *                + 3.*delt*cfr(i,j,k)*qfr/lfi
+c     *                - delt*wrise*(cfr(i,j,k)-cfr(i,j,k-1))*odz
+     *                 - delt*wrise*(cfr(i,j,k+1)-cfr(i,j,k-1))*tdz
+c
+c remove negative ice concentrations before they affect th and s
+c       
+            if(cfr(i,j,k).lt.0.0.and.dfrz.gt.0) then
+              cfr(i,j,k) = 1.0e-7
+            else if(cfr(i,j,k).lt.0.0) then
+              cfr(i,j,k) = 0.0
+            endif
+            if(cfr(i,j,k).gt.0.1) then
+              cfr(i,j,k) = 1.e-7
+            endif
+c
+            heatflux = 2.*cfr(i,j,k)*qfr/(lfw*rhob(k))
+c            heatflux = 3.*cfr(i,j,k)*qfr/(lfw*rhob(k))
+            th(i,j,k) = th(i,j,k) + delt*heatflux
+            cheat(k) = cheat(k) + heatflux
+          
+            saltflux = 2.*sal(i,j,k)*cfr(i,j,k)*qfr/(lfs*rhob(k))
+c            saltflux = 3.*sal(i,j,k)*cfr(i,j,k)*qfr/(lfs*rhob(k))
+            sal(i,j,k) = sal(i,j,k) + delt*saltflux
+            sflux(k) = sflux(k) + saltflux
+          enddo 
+c
+c next, need to compute the ice growth rate and heat flux at ice bottom
+c 
+c
+c add deposited frazil ice
+c
+          hice(i,j) = hice(i,j) + 
+     *         wrise*cfr(i,j,olev)*delt*odz*deldepth
+c
+c set tice if ice is thin
+c
+          if(hice(i,j).lt.0.2) then
+            tice(i,j) = tfreez
+          endif
+#endif
+c
+c Deal with the grid points that have an ice slab.
+c
+c We use the full formula described by McPhee (1987) that accounts for
+c the differences in molecular diffusion rates of t and s at the ice 
+c water interface.  This allows for reduced melting rates and provides
+c a more accurate temperature profile when the water is freezing.
+c
+c
+          if(iceheat) then
+c
+c
+c compute the ice slab temperature based on surface heat flux balance
+c ice base temperature is set to 0.0 for melting warm season ice, and
+c to the sea water freezing temperature for cold season ice
+c
+            rtn = 271.
+#if defined(WARMICE)
+            tfreez = 0.0
+            fice = 0.0
+            tice(i,j) = 0.0
+c #endif
+#else
+            tfreez = -0.054*sal(i,j,olev)
+            zlev = (kdim-olev)*dz+0.5*dz
+c
+c #if defined(WARMICE)
+            hice(i,j) = hice(i,j)+2.
+c #endif
+            do iter = 1,5
+              ticea = rtn-273.
+c              koni = 223.95 - 1.07*ticea
+c              konb = 52.33 + 1.26*(ticea) + 0.00586*(ticea)**2
+c              kond = koni*(1.0 - vbr(i,j)) +
+c     *                     konb*vbr(i,j)
+              kond = 2.03+0.117*sice(i,j)/(rtn-273.)
+c               kond = 2.03
+c
+c add snow layer with conductivity ks and depth hsnow ala Cox and Weeks
+c
+              if(hice(i,j).gt.0.5.and.hsnow.gt.0.0) then
+                kond = ks*kond/(hice(i,j)*ks + hsnow*kond)
+              else
+                if(hice(i,j).ge.0.01) then
+                  kond = kond/hice(i,j)
+                else
+                  kond = kond/0.01
+                endif
+              endif
+              f = flong+randn(i,j)*hcoef*(tair-rtn)-epsig*rtn**4+kond*
+     *          (tfreez+273.-rtn) + flat
+              df = -hcoef-4*epsig*rtn**3-kond
+              dxx = f/df 
+              rtn = rtn-dxx 
+              if((193.-rtn)*(rtn-278.).lt.0.) then 
+                 write(*,*)"Newton-R failed ",rtn ,i,j,iter,f
+                 write(*,*)"hice,rtn,tfreez,sal,olev ",hice(i,j),rtn,
+     *           tfreez,sal(i,j,olev),olev
+                 write(*,*)"kond,flong,flat,tair ",kond,flong,flat,tair
+                 nerr=1
+#if defined(USEMPI)
+                 call MPI_Abort(MPI_COMM_WORLD, 1,nerr)
+#endif
+              endif 
+              if(abs(dxx).lt.xacc) then 
+                 goto 111
+              endif 
+            enddo 
+111         continue
+#if defined(WARMICE)
+            hice(i,j) = hice(i,j)-2.
+#endif
+
+            f = flong+hcoef*(tair-rtn)-epsig*rtn**4+kond*
+     *          (tfreez+273.-rtn) + flat
+            t0 = rtn-273.
+            fice = -kond*(tfreez-t0)
+c
+c do different things depending on number of ice levels
+c
+c assume that the lowest level is at tfreezing of the underlying water
+c
+c need to solve for the ice temperature here
+c
+            tice(i,j) =  t0
+#endif
+c
+c now we have all the needed variables to compute ice growth/melt rates
+c
+c calculate McPhee's adjusted nondimensional fluxes (reduced eq. 8 with
+c b = 1.57 (on page 7029)
+c
+            if(deldepth.lt.0.001) then
+               deldepth = 0.01
+            endif
+            if(uistar(i,j).lt.0.001) then
+              uistar(i,j) = 0.001
+            endif
+c
+c convert fice to water heat flux
+c
+            fice = fice/(cp*rhob(olev))
+c
+c next section is Yaglom section that is used for freezing conditions
+c
+c #if !defined(WARMICE)
+#if defined(KY)
+c            coef = .52*sqrt(uistar(i,j)*znot/kmb)
+            coef = 1.57*sqrt(uistar(i,j)*znot/kmb)
+            phiturb = 2.5*log(odepth/znot)
+            phiheat = phiturb + coef*(kmb/khb)**0.66667
+            phisal = phiturb + coef*(kmb/kms)**0.66667
+c            phiheat = phiturb+2.5*log(znot*uistar(i,j)*2.5/khb)
+c            phisal = phiturb+2.5*log(znot*uistar(i,j)*2.5/kms)
+c            phiheat = phiturb + 20.
+c            phisal = phiturb + 100.
+c            dss = m*(sal(i,j,olev)-sice(i,j))
+            dss = 0.0
+            c2 = (lh+dss)*phiheat/phisal
+
+
+
+c            if(deptho-hice(i,j).lt.0.0) then
+c              write(*,*)"Error in ice log i,j,my_pe", i,j,my_pe
+c              write(*,*)"deptho,hice,olev ",deptho,hice(i,j),olev
+c              write(*,*)"th,sal ",th(i,j,olev),
+c     *                   sal(i,j,olev)
+c              write(*,*)"kdist ",kdist
+c#if defined(USEMPI)
+c              call MPI_Abort(MPI_COMM_WORLD, 1,nerr)
+c#endif
+c            endif
+            if(deldepth.lt.0.001) then
+               deldepth = 0.01
+            endif
+c
+c
+c solve quadratic equation
+c
+            b = th(i,j,olev)+phiheat*fice/uistar(i,j) - 
+     *          m*sice(i,j) + c2
+c
+            a = m
+c
+            c = -th(i,j,olev)*sice(i,j) - phiheat*fice*
+     *          sice(i,j)/uistar(i,j) - c2*sal(i,j,olev)
+c
+            sw = (-b + sqrt(b*b - 4.*a*c))/(2.*a)
+c
+c compute ice increase
+c
+            if(abs(sw-sice(i,j)).gt.0.5) then
+              wice = harea(i,j)*uistar(i,j)*
+     *             (sal(i,j,olev) - sw)/(phisal*
+     *             (sw - sice(i,j)))
+            else
+              wice = harea(i,j)*
+     *               uistar(i,j)*(th(i,j,olev)+m*sw)/(lh*phiheat)
+            endif
+#else
+c
+c Ok, here is the warm season approach for getting heat/salt flux from
+c the ice to the sea water
+c
+c harea is the relative surface area.  It is larger for sloping ice 
+c surfaces, 1 for flat ice
+c
+c
+            dels = sal(i,j,olev)-sice(i,j)
+            ch = 0.0056*uistar(i,j)*delt/deldepth
+            coef = 1./(1. + dels*m*ch/lh)
+c            sal(i,j,olev) = coef*(sal(i,j,olev)
+c     *          -dels*ch*th(i,j,olev)/lh -
+c     *          dels*delt*fice/(lh*deldepth))*harea(i,j)
+            wice = ((th(i,j,olev)+m*sal(i,j,olev))*uistar(i,j)*0.0056+
+     *            fice)*harea(i,j)/lh
+#endif
+            wice = wice*randn(i,j)
+c
+c once we have the ice growth velocity, wice, the fluxes are calculated 
+c wice + is melting, - is freezing
+c
+            heatflux = -1.*wice*lh/deldepth +
+     *                     (fice+wice*dss)/deldepth
+            saltflux = -1.*wice*
+     *            (sal(i,j,olev)-sice(i,j))/deldepth
+c
+c adjust top ocean grid point temperature and salt
+c
+            th(i,j,olev) = th(i,j,olev)+delt*heatflux
+c
+            sal(i,j,olev) = sal(i,j,olev)+delt*saltflux
+c
+            sicebc = sicebc + saltflux*deldepth
+            hicebc = hicebc + heatflux*deldepth
+            icesal(i,j) = saltflux*deldepth
+            iceh(i,j) = heatflux*deldepth
+c
+c if ice forming, then set ocean T to freezing T, else diffuse
+c heat
+c            if(wice.gt.0.0) then
+c              th(i,j,olev) = th(i,j,olev)-delt*uistar*0.0056*
+c     *         (th(i,j,olev)+m*sal(i,j,olev))/deldepth
+c	    else
+c
+c
+c	      th(i,j,olev) = th(i,j,olev) - ch*(th(i,j,olev)
+c     *           +m*sal(i,j,olev))+wice*0.054*dels*delt/deldepth
+c	    endif
+c
+c grow the ice
+c
+            hice(i,j) = hice(i,j)-delt*rhob(olev)*wice/rhoice
+c
+c save the salt flux from ice
+c
+c            icesal(i,j,olev) = icesal(i,j,olev)-wice*
+c     *         (sal(i,j,olev)-sice(i,j))
+c
+          endif
+c
+c use lf_tmask to indicate where ice is so that latent heat flux
+c affect on salinity is zero with ice coverage greater than 10 cm
+c also eliminate wind stress with ice coverage
+c
+c eventually, these should be replaced with functions that gradually
+c cutoff fluxes as hice increases
+c
+          if(int(nn*delt).ge.ltime) then
+#if defined(PRINTDEBUG)
+            if(iope.and.i.eq.1.and.j.eq.1) write(*,*)"Redo mask"
+#endif
+            if(lead) then
+              strton = .true.
+              lfton = .true.
+              if(hice(i,j).gt.0.01) then
+                hf_tmask(i,j) = 0.0
+                lf_tmask(i,j) = 0.0
+                str_tbc(i,j) = 1.0
+                str_tmask(i,j) = 0.0
+              else
+                hf_tmask(i,j) = 1.0
+                lf_tmask(i,j) = 1.0
+                str_tbc(i,j) = 1.0
+                str_tmask(i,j) = 1.0
+              endif
+            endif
+          endif
+c
+          if(iceheat.and.(olev.le.kdim)) then
+            do k=olev+1,kdim1
+c              sal(i,j,k) = sal(i,j,olev)
+c              th(i,j,k) = th(i,j,olev)
+#if !defined(WARMICE)
+              cfr(i,j,k) = cfr(i,j,olev)
+#endif
+c              um(i,j,k) = 0.0
+c              um(i+1,j,k) = 0.0
+c              vm(i,j,k) = 0.0
+c              vm(i,j+1,k) = 0.0
+c              wm(i,j,k) = 0.0
+c              umm(i,j,k) = 0.0
+c              umm(i+1,j,k) = 0.0
+c              vmm(i,j,k) = 0.0
+c              vmm(i,j+1,k) = 0.0
+c              wmm(i,j,k) = 0.0
+            enddo
+          endif
+c
+c
+c
+c          iceh(i,j) = fice*cp*rhob(olev)
+c
+c          do k=1,kdim1
+c           if(th(i,j,k).gt.20.0.or.th(i,j,k).lt.-2) then
+c             write(*,*)"th trashed ",i,j,k,my_pe
+c           endif
+c           if(sal(i,j,k).gt.35..or.sal(i,j,k).lt.24.) then
+c             write(*,*)"sal trashed ",i,j,k,my_pe
+c           endif
+c          enddo
+c
+        enddo
+      enddo
+c
+c compute new cell volumes and flux areas
+c
+c      call volarea(hice)
+c
+c update velocity image points
+c
+      call topbotb(th,MDTEMP,nn)
+      call topbotb(sal,MDSAL,nn)
+#if !defined(WARMICE)
+      call topbotb(cfr,MDNULL,nn)
+      call imag(cfr)
+#endif
+c      call imag(vm)
+c      call imag(um)
+c      call imag(wm)
+c      call imag(umm)
+c      call imag(vmm)
+c      call imag(wmm)
+      call imag(sal)
+      call imag(th)
+c
+c advect ice properties
+c
+      call imag2d(tice)
+      call imag2d(sice)
+c
+c section for moving lead  instead of ocean
+c
+c      if(int(nn*delt).ge.ltime.and.uice.ne.0.0.and.lead) then
+c        call imag2d(hice)
+c        call imag2d(hf_tmask)
+c        call imag2d(lf_tmask)
+c        call imag2d(str_tmask)
+c        call imag2d(str_tbc)
+cc
+c        call leveq2d(nn,hice,hicep,MDHICE)
+c        call leveq2d(nn,tice,ticep,MDTICE)
+c        call leveq2d(nn,sice,sicep,MDSICE)
+c
+c do updates
+c
+c        do i=0,idim1
+c           do j=0,jdim1
+c             hice(i,j) = hicep(i,j)
+c             sice(i,j) = sicep(i,j)
+c             tice(i,j) = ticep(i,j)
+c           enddo
+c        enddo
+c      endif
+c
+      if(mod(nn,interval).eq.0.and.my_pe.eq.0)then
+      write(*,*)"pe ",my_pe
+      write(*,*)"Time is ",nn*delt/3600, " hours"
+      write(*,*)"Uice is ",uice,um(2,2,olev)
+      
+      write(*,*)"olev,deptho,deldepth ",olev,deptho,deldepth
+      write(*,*)"odepth,wice ",odepth,wice
+      write(*,*)"growth rate ",-rhob(olev)*wice/rhoice
+      write(*,*)"ice thickness ", hice(idim,jdim)
+      write(*,*)"T(olev),tfreez ",th(idim,jdim,olev),tfreez
+      write(*,*)"ice temperature,adiabatic rate ",t0,dthdz
+      write(*,*)"Wall salinity,phit,phih ",sw,phiturb,phiheat
+      write(*,*)"phisal,a,b,c,c2 ",phisal,a,b,c,c2
+      write(*,*)"Heat flux from ice ",fice*cp*rhob(olev)
+      write(*,*)"Heat flux into freezing/melting ",wice*lh*cp*rhob(olev)
+      write(*,*)"heatflux into water",heatflux*cp*rhob(olev)*deldepth
+      write(*,*)"saltflux into water",saltflux*deldepth
+      write(*,*)"flat, flong ",flat,flong
+      write(*,*)"randn ",randn(idim,jdim)
+      write(*,*)"uistar ",uistar(idim,jdim)
+#if !defined(WARMICE)
+      write(*,*)"Frazil heat flux ",3.*cfr(idim,jdim,olev)*qfr*cp/lfw
+#endif
+      write(*,*)"water temperature ",(th(idim,jdim,k),k=kdim-5,kdim)
+      write(*,*)"water salinity ",(sal(idim,jdim,k),k=kdim-5,kdim)
+#if !defined(WARMICE)
+      write(*,*)"Frazil concentration ",
+     *   (cfr(idim,jdim,k),k=kdim,kdim-3,-1)
+#endif
+      endif
+c
+c output a column of data every timestep
+c
+      if(my_pe.lt.6) then
+        if(int(nn*delt).gt.ltime) then
+c
+c if lead is turned on, then move station at uice velocity
+c
+          statx = statx + uice*delt
+          ist = int(statx/dx)+1
+          if(ist.gt.(idim+1)) then
+            ist = 1
+            statx = statx - idim*dx
+          endif
+          if(ist.eq.idim) then
+c
+c special case where station is between idim and 1
+c
+            i1 = idim
+            i2 = 1
+          else
+            i1 = ist
+            i2 = ist+1
+          endif
+          xdif = statx - (ist-1)*dx
+          do k=1,kdim
+c
+c interpolate column of t,s,u,v,w
+c
+            t1 = th(i1,js,k)
+            t2 = th(i2,js,k)
+            ths(k) = t1 + (t2-t1)*xdif/dx
+            t1 = sal(i1,js,k)
+            t2 = sal(i2,js,k)
+            sals(k) = t1 + (t2-t1)*xdif/dx
+            t1 = wm(i1,js,k)
+            t2 = wm(i2,js,k)
+            wms(k) = t1 + (t2-t1)*xdif/dx
+            t1 = um(i1,js,k)
+            t2 = um(i2,js,k)
+            ums(k) = t1 + (t2-t1)*xdif/dx
+            t1 = vm(i1,js,k)
+            t2 = vm(i2,js,k)
+            vms(k) = t1 + (t2-t1)*xdif/dx
+          enddo
+          staunit = 12+my_pe
+          write(staunit,*)delt*nn,statx,is
+          do k=1,kdim
+            write(staunit,900)ths(k),sals(k),wms(k),ums(k),vms(k)
+900         format(5(1x,e14.7))
+          enddo
+        endif
+      endif
+           
+      return
+      end

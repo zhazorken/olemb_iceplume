@@ -1,0 +1,156 @@
+      subroutine volbot(hght)
+#include "param.inc"
+#include "finitv.inc"
+#include "olemp.inc"
+c
+c This routine computes the finite element volume and cell boundary area
+c given a 2-D terrain array
+c
+      real hght(0:idim1,0:jdim1)
+      real tmpp(0:idim1,0:jdim1)
+c      real way(0:idim1,0:jdim1,0:kdim1)
+c      real frac(0:idim1,0:jdim1)
+c      integer kdist(0:idim1,0:jdim1)
+      integer i,j,k,kmin,junk,olev
+c
+c first calculate the grid level for the terrain at each point and the
+c fractional distance (or volume) left in the grid cell
+c
+c set ktop to kdim1, this will need adjustment for bottom terrain
+c
+c
+c
+      do k=0,kdim1
+        do j=0,jdim1
+          do i=0,idim1
+            ax(i,j,k)  = 1.0
+            ay(i,j,k)  = 1.0
+            vay(i,j,k) = 1.0
+            bay(i,j,k) = 1.0
+            way(i,j,k) = 1.0
+            frac(i,j)  = 0.0
+            kdist(i,j) = 0
+          enddo
+        enddo
+      enddo
+c
+      do i=1,idim
+        do j=1,jdim
+          kdist(i,j) = int(hght(i,j)/dz)+1
+
+c         this is wrong
+c           frac(i,j) = hght(i,j)/dz-kdist(i,j)-1
+c         this is right
+          frac(i,j) = hght(i,j)/dz-kdist(i,j)+1
+
+c           if (i.eq.4) then
+c 
+c             write(lunit,919) j,kdist(4,j),hght(4,j),frac(4,j)
+c 919         format('mark 1 - j = ',i3,' kdist = ',i3,' hght = ',f5.2,
+c      *       ' frac = ',f5.2)
+c 
+c           endif
+
+          if(frac(i,j).lt.0.1) then
+            frac(i,j) = 0.1
+          else if (frac(i,j).gt.0.9) then
+            if(kdist(i,j-1).gt.kdist(i,j))then
+c
+c transition cell
+c
+
+
+c   mark i have commented this out for runs12
+c
+              way(i,j,kdist(i,j)+1) = 0.5
+
+              frac(i,j) = 0.9
+            else if(kdist(i,j-1).eq.kdist(i,j)) then
+              frac(i,j) = 0.9
+            endif
+          endif
+           frac(i,j) = 1.-frac(i,j)
+
+c           if (i.eq.4) then
+c 
+c             write(lunit,920) j,kdist(4,j),hght(4,j),frac(4,j)
+c 920         format('mark 2 - j = ',i3,' kdist = ',i3,' hght = ',f5.2,
+c      *       ' frac = ',f5.2)
+c 
+c           endif
+
+        enddo
+      enddo
+c
+c do boundaries for kdist using real imag2d
+c
+      do j=1,jdim
+        do i=1,idim
+          tmpp(i,j) = kdist(i,j)
+        enddo
+      enddo
+      call imag2d(tmpp)
+      do j=0,jdim1
+        do i=0,idim1
+          kdist(i,j) = nint(tmpp(i,j))
+        enddo
+      enddo
+c
+c
+      call imag2d(frac)
+c
+c compute volume for v component as an average
+c
+      call imag(way)
+c
+      do i=1,idim
+        do j=1,jdim
+          olev = kdist(i,j)
+          if(kdist(i,j).eq.kdist(i,j-1)) then
+            if(frac(i,j).lt.frac(i,j-1)) then
+              vay(i,j,olev) = frac(i,j)
+              ay(i,j,olev) = frac(i,j)
+            else
+              vay(i,j,olev) = frac(i,j-1)
+              ay(i,j,olev) = frac(i,j-1)
+            endif
+          endif
+        enddo
+      enddo
+
+      do i=1,idim
+        do j=1,jdim
+          olev = kdist(i,j)
+          way(i,j,olev) = 0.0
+        enddo
+      enddo
+c
+      call imag(ax)
+      call imag(ay)
+      call imag(bay)
+      call imag(vay)
+      call imag(way)
+      do i=0,idim
+        do j=0,jdim
+          if(kdist(i,j).gt.1) then
+          do k=0,kdist(i,j)-1
+            ax(i,j,k) = 0.0
+            ay(i,j,k) = 0.0
+            bay(i,j,k) = 0.0
+            vay(i,j,k) = 0.0
+            ax(i+1,j,k) = 0.0
+            ay(i,j+1,k) = 0.0
+            bay(i,j+1,k) = 0.0
+            vay(i,j+1,k) = 0.0
+            way(i,j,k) = 0.0
+          enddo
+          endif
+        enddo
+      enddo
+      call imag(ax)
+      call imag(ay)
+      call imag(bay)
+      call imag(way)
+      call imag(vay)
+      return
+      end

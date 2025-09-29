@@ -1,0 +1,407 @@
+c
+c   $Id: varinit.inc.in,v 1.5 1998/11/04 23:47:07 dwd Exp $
+c
+      data mdvcde(1),mdvnme(1),mdvstr(1),mdvunt(1),mdvfmt(1),mdvppl(1)
+     *     /MDUVEL,'u','u velocity','m s-1','f6.2',
+     *'@tiu'/
+      data mdvcde(2),mdvnme(2),mdvstr(2),mdvunt(2),mdvfmt(2),mdvppl(2)
+     *     /MDVVEL,'v','v velocity','m s-1','f6.2',
+     *'@tiv'/
+      data mdvcde(3),mdvnme(3),mdvstr(3),mdvunt(3),mdvfmt(3),mdvppl(3)
+     *     /MDWVEL,'w','w velocity','m s-1','f6.2',
+     *'@tiw'/
+      data mdvcde(4),mdvnme(4),mdvstr(4),mdvunt(4),mdvfmt(4),mdvppl(4)
+     *     /MDPRES,'p_p','perturbation pressure','Pa','e10.2',
+     *'@tip@ma47'/
+      data mdvcde(5),mdvnme(5),mdvstr(5),mdvunt(5),mdvfmt(5),mdvppl(5)
+     *     /MDTEMP,'t','potential temperature','degC','f6.2',
+     *'@cgQ'/
+      data mdvcde(6),mdvnme(6),mdvstr(6),mdvunt(6),mdvfmt(6),mdvppl(6)
+     *     /MDSAL,'s','salinity','ppt','f6.2',
+     *'@tiS'/
+      data mdvcde(7),mdvnme(7),mdvstr(7),mdvunt(7),mdvfmt(7),mdvppl(7)
+     *     /MDRHO,'rho_p','perturbation density','kg m-3','f6.2',
+     *'@cgr@ma47'/
+      data mdvcde(8),mdvnme(8),mdvstr(8),mdvunt(8),mdvfmt(8),mdvppl(8)
+     *     /MDNULL,' ',' ',' ',' ',' '/
+      data mdvcde(9),mdvnme(9),mdvstr(9),mdvunt(9),mdvfmt(9),mdvppl(9)
+     *     /MDTRCR,'trcr','tracer',' ','f6.2',
+     *'@astrcr'/
+      data mdvcde(10),mdvnme(10),mdvstr(10),mdvunt(10),mdvfmt(10),
+     *     mdvppl(10)
+     *     /MDTKE,'tke','turbulent kinetic energy','m2 s-2','e10.2',
+     *'@ti0.5 u_i\@ma47@ti^2'/
+      data mdvcde(11),mdvnme(11),mdvstr(11),mdvunt(11),mdvfmt(11),
+     *     mdvppl(11)
+     *     /MDKH,'kh','turbulent heat diffusion','m2 s-1','e10.2',
+     *'@tiK_h'/
+      data mdvcde(12),mdvnme(12),mdvstr(12),mdvunt(12),mdvfmt(12),
+     *     mdvppl(12)
+     *     /MDKM,'km','turbulent momentum diffusion','m2 s-1','e10.2',
+     *'@tiK_m'/
+      data mdvcde(13),mdvnme(13),mdvstr(13),mdvunt(13),mdvfmt(13),
+     *     mdvppl(13)
+     *     /MDRHOT,'rho','density','kg m-3 @ 1000','e10.2',
+     *'@cgr'/
+      data mdvcde(14),mdvnme(14),mdvstr(14),mdvunt(14),mdvfmt(14),
+     *     mdvppl(14)
+     *     /MDZI,'zi','mixed layer depth','m','e10.2',
+     *'@tiz_i'/
+      data mdvcde(15),mdvnme(15),mdvstr(15),mdvunt(15),mdvfmt(15),
+     *     mdvppl(15)
+     *     /MDWSTAR,'w_star','tke velocity scale','m s-1','e10.2',
+     *'@tiw_*'/
+      data mdvcde(16),mdvnme(16),mdvstr(16),mdvunt(16),mdvfmt(16),
+     *     mdvppl(16)
+     *     /MDTSTAR,'t_star','tke temp scale','degC','e10.2',
+     *'@tiT_*'/
+      data mdvcde(17),mdvnme(17),mdvstr(17),mdvunt(17),mdvfmt(17),
+     *     mdvppl(17)
+     *     /MDTBAR,'t_bar','integrated temperature','degC','e10.2',
+     *'@ast_bar'/
+      data mdvcde(18),mdvnme(18),mdvstr(18),mdvunt(18),mdvfmt(18),
+     *     mdvppl(18)
+     *     /MDSBAR,'s_bar','integrated salinity','ppt','e10.2',
+     *'@ass_bar'/
+      data mdvcde(19),mdvnme(19),mdvstr(19),mdvunt(19),mdvfmt(19),
+     *     mdvppl(19)
+     *     /MDQ,'q','heat flux','W m-2','e10.2',
+     *'@asq'/
+      data mdvcde(20),mdvnme(20),mdvstr(20),mdvunt(20),mdvfmt(20),
+     *     mdvppl(20)
+     *     /MDHFSGS,'hf_sgs','SGS heat flux','m s-1 degC','e10.2',
+     *'@ashf_sgs'/
+      data mdvcde(21),mdvnme(21),mdvstr(21),mdvunt(21),mdvfmt(21),
+     *     mdvppl(21)
+     *     /MDHFT,'hf_top','total heat flux','W m-2','e10.2',
+     *'@tiQ_n_e_t'/
+      data mdvcde(22),mdvnme(22),mdvstr(22),mdvunt(22),mdvfmt(22),
+     *     mdvppl(22)
+     *     /MDUSTT,'ustr_t','ucomp top stress','Pa','e10.2',
+     *'@cgt@ti_x'/
+      data mdvcde(23),mdvnme(23),mdvstr(23),mdvunt(23),mdvfmt(23),
+     *     mdvppl(23)
+     *     /MDVSTT,'vstr_t','vcomp top stress','Pa','e10.2',
+     *'@cgt@ti_y'/
+      data mdvcde(24),mdvnme(24),mdvstr(24),mdvunt(24),mdvfmt(24),
+     *     mdvppl(24)
+     *     /MDWAVEL,'wave_l','wavelength',' m','e10.2',
+     *'@cgl'/
+      data mdvcde(25),mdvnme(25),mdvstr(25),mdvunt(25),mdvfmt(25),
+     *     mdvppl(25)
+     *     /MDWAVEH,'wave_h','wave height','m','e10.2',
+     *'@tiH'/
+      data mdvcde(26),mdvnme(26),mdvstr(26),mdvunt(26),mdvfmt(26),
+     *     mdvppl(26)
+     *     /MDANGLE,'w_angle','wave angle','deg','e10.2',
+     *'@cgf'/
+      data mdvcde(27),mdvnme(27),mdvstr(27),mdvunt(27),mdvfmt(27),
+     *     mdvppl(27)
+     *     /MDUM,'um','u at t-1','m s-1','f6.2',
+     *'@tiu^t^-^1'/
+      data mdvcde(28),mdvnme(28),mdvstr(28),mdvunt(28),mdvfmt(28),
+     *     mdvppl(28)
+     *     /MDUMM,'umm','u at t-2','m s-1','f6.2',
+     *'@tiu^t^-^2'/
+      data mdvcde(29),mdvnme(29),mdvstr(29),mdvunt(29),mdvfmt(29),
+     *     mdvppl(29)
+     *     /MDWM,'wm','w at t-1','m s-1','f6.2',
+     *'@tiw^t^-^1'/
+      data mdvcde(30),mdvnme(30),mdvstr(30),mdvunt(30),mdvfmt(30),
+     *     mdvppl(30)
+     *     /MDWMM,'wmm','w at t-2','m s-1','f6.2',
+     *'@tiw^t^-^2'/ 
+      data mdvcde(31),mdvnme(31),mdvstr(31),mdvunt(31),mdvfmt(31),
+     *     mdvppl(31)
+     *     /MDVM,'vm','v at t-1','m s-1','f6.2',
+     *'@tiv^t^-^1'/
+      data mdvcde(32),mdvnme(32),mdvstr(32),mdvunt(32),mdvfmt(32),
+     *     mdvppl(32)
+     *     /MDVMM,'vmm','v at t-2','m s-1','f6.2',
+     *'@tiv^t^-^2'/ 
+      data mdvcde(33),mdvnme(33),mdvstr(33),mdvunt(33),mdvfmt(33),
+     *     mdvppl(33)
+     *     /MDRHOBM1,'rhobm1','background density','kg m-3 @ 1000',
+     *      'e10.2',
+     *'@cgr@ti\^-'/
+      data mdvcde(34),mdvnme(34),mdvstr(34),mdvunt(34),mdvfmt(34),
+     *     mdvppl(34)
+     * 	   /MDHFTMASK,'hf_tmask','heatflux mask',' ','f6.2',
+     *'@ashf_tmask'/
+      data mdvcde(35),mdvnme(35),mdvstr(35),mdvunt(35),mdvfmt(35),
+     *     mdvppl(35)
+     * 	   /MDLFTMASK,'lf_tmask','latent heat flux mask',' ',
+     *      'f6.2',
+     *'@aslf_tmask'/
+      data mdvcde(36),mdvnme(36),mdvstr(36),mdvunt(36),mdvfmt(36),
+     *     mdvppl(36)
+     * 	   /MDSTRTMASK,'str_tmask','wind stress mask',' ','f6.2',
+     *'@asstr_tmask'/
+      data mdvcde(37),mdvnme(37),mdvstr(37),mdvunt(37),mdvfmt(37),
+     *     mdvppl(37)
+     * 	   /MDSTRTBC,'str_tbc','stress b.c.',' ','i1',
+     *'@asstr_tbc'/
+      data mdvcde(38),mdvnme(38),mdvstr(38),mdvunt(38),mdvfmt(38),
+     *     mdvppl(38)
+     *     /MDPLUME,'plmarr','plume confidence',' ','f6.2',
+     *'@asplmarr'/
+      data mdvcde(39),mdvnme(39),mdvstr(39),mdvunt(39),mdvfmt(39),
+     *     mdvppl(39)
+     *     /MDTAVE,'t_ave','horiz ave temperature','degC','f6.2',
+     *'@ma26@cgQ@ma27'/
+      data mdvcde(40),mdvnme(40),mdvstr(40),mdvunt(40),mdvfmt(40),
+     *     mdvppl(40)
+     *     /MDT2AVE,'t2_ave','horiz ave temp variance','degC2',
+     *     'f6.2',
+     *'@ma26@cgQ@ma47@ti^2@ma27'/
+      data mdvcde(41),mdvnme(41),mdvstr(41),mdvunt(41),mdvfmt(41),
+     *     mdvppl(41)
+     *     /MDSAVE,'s_ave','horiz ave salinity','ppt','f6.2',
+     *'@ma26@tiS@ma27'/
+      data mdvcde(42),mdvnme(42),mdvstr(42),mdvunt(42),mdvfmt(42),
+     *     mdvppl(42)
+     *     /MDS2AVE,'s2_ave','horiz ave salinity variance','ppt',
+     *     'f6.2',
+     *'@ma26@tiS@ma47@ti^2@ma27'/
+      data mdvcde(43),mdvnme(43),mdvstr(43),mdvunt(43),mdvfmt(43),
+     *     mdvppl(43)
+     *     /MDTKEAVE,'tke_ave','horiz ave tke','m2 s-2','f6.2',
+     *'@ti0.5 @ma26@tiu_i\@ma47@ti^2@ma27'/
+      data mdvcde(44),mdvnme(44),mdvstr(44),mdvunt(44),mdvfmt(44),
+     *     mdvppl(44)
+     *     /MDKEAVE,'KE_ave','horiz ave kinetic energy','m2 s-2',
+     *     'f6.2',
+     *'@ti0.5 @ma26@tiu_i\^2@ma27'/
+      data mdvcde(45),mdvnme(45),mdvstr(45),mdvunt(45),mdvfmt(45),
+     *     mdvppl(45)
+     *     /MDW2AVE,'w2_ave','horiz ave w variance','m2 s-2','f6.2',
+     *'@ma26@tiw@ma47@ti^2@ma27'/
+      data mdvcde(46),mdvnme(46),mdvstr(46),mdvunt(46),mdvfmt(46),
+     *     mdvppl(46)
+     *     /MDWTAVE,'wt_ave','horiz ave heat flux','m s-1 degC',
+     *     'f6.2',
+     *'@ma26@tiw@ma47@cgQ@ma4727'/
+      data mdvcde(47),mdvnme(47),mdvstr(47),mdvunt(47),mdvfmt(47),
+     *     mdvppl(47)
+     *     /MDWSAVE,'ws_ave','horiz ave salt flux','m s-1 ppt',
+     *     'f6.2',
+     *'@ma26@tiw@ma47@tiS@ma4727'/
+      data mdvcde(48),mdvnme(48),mdvstr(48),mdvunt(48),mdvfmt(48),
+     *     mdvppl(48)
+     *     /MDWRHOAVE,'dpea','advective PE change','m2 s-3','f6.2',
+     *'@asdpea'/
+      data mdvcde(49),mdvnme(49),mdvstr(49),mdvunt(49),mdvfmt(49),
+     *     mdvppl(49)
+     *     /MDRHOPAVE,'rhop_ave','horiz ave perturbation density',
+     *     'kg m-3','f6.2',
+     *'@ma26@cgr@ma4727'/
+      data mdvcde(50),mdvnme(50),mdvstr(50),mdvunt(50),mdvfmt(50),
+     *     mdvppl(50)
+     *     /MDSWHFT,'swf_top','short wave heat flux','W m-2','e10.2',
+     *'@tiR_S'/
+      data mdvcde(51),mdvnme(51),mdvstr(51),mdvunt(51),mdvfmt(51),
+     *     mdvppl(51)
+     *     /MDRAIN,'rain','rainfall','m','e10.2',
+     *'@asrain'/
+      data mdvcde(52),mdvnme(52),mdvstr(52),mdvunt(52),mdvfmt(52),
+     *     mdvppl(52)
+     *     /MDUAVE,'u_ave','horiz ave u','m s-1','e10.2',
+     *'@ma26@tiu@ma27'/
+      data mdvcde(53),mdvnme(53),mdvstr(53),mdvunt(53),mdvfmt(53),
+     *     mdvppl(53)
+     *     /MDVAVE,'v_ave','horiz ave v','m s-1','e10.2',
+     *'@ma26@tiv@ma27'/
+      data mdvcde(54),mdvnme(54),mdvstr(54),mdvunt(54),mdvfmt(54),
+     *     mdvppl(54)
+     *     /MDU2AVE,'u2_ave','horiz ave u variance','m2 s-2','e10.2',
+     *'@ma26@tiu@ma47@ti^2@ma27'/
+      data mdvcde(55),mdvnme(55),mdvstr(55),mdvunt(55),mdvfmt(55),
+     *     mdvppl(55)
+     *     /MDV2AVE,'v2_ave','horiz ave v variance','m2 s-2','e10.2',
+     *'@ma26@tiv@ma47@ti^2@ma27'/
+      data mdvcde(56),mdvnme(56),mdvstr(56),mdvunt(56),mdvfmt(56),
+     *     mdvppl(56)
+     *     /MDHFAVE,'hf_ave','horiz ave hf_sgs','m s-1 degC','e10.2',
+     *'@ma26@tiK_h@ma64@cgQ@ma1964@tiz@ma27'/
+      data mdvcde(57),mdvnme(57),mdvstr(57),mdvunt(57),mdvfmt(57),
+     *     mdvppl(57)
+     *     /MDRHOFAVE,'rhof_ave','horiz ave rhof_sgs','m s-1 kg m-3',
+     *     'e10.2',
+     *'@ma2664@tiK_h@cr(@ma64@cgr@ma1964@tiz@cr)@ma1964@tiz@ma27'/
+      data mdvcde(58),mdvnme(58),mdvstr(58),mdvunt(58),mdvfmt(58),
+     *     mdvppl(58)
+     *     /MDSFAVE,'sf_ave','horiz ave sf_sgs','m s-1 ppt','e10.2',
+     *'@ma26@tiK_h@ma64@tiS@ma1964@tiz@ma27'/
+      data mdvcde(59),mdvnme(59),mdvstr(59),mdvunt(59),mdvfmt(59),
+     *     mdvppl(59)
+     *     /MDP2AVE,'p2_ave','horiz ave p_p variance','Pa','e10.2',
+     *'@ma26@tip@ma47@ti^2@ma27'/
+      data mdvcde(60),mdvnme(60),mdvstr(60),mdvunt(60),mdvfmt(60),
+     *     mdvppl(60)
+     *     /MDLHFT,'lhf_top','latent heat flux','W m-2','e10.2',
+     *'@tiQ_L'/
+      data mdvcde(61),mdvnme(61),mdvstr(61),mdvunt(61),mdvfmt(61),
+     *     mdvppl(61)
+     *     /MDUFAVE,'uf_ave','horiz ave u filter','m s-2','e10.2',
+     *'@ma26@tiu@ma47@cr(@cga@ma65@ti^1^2u@cr)@ma4727'/
+      data mdvcde(62),mdvnme(62),mdvstr(62),mdvunt(62),mdvfmt(62),
+     *     mdvppl(62)
+     *     /MDVFAVE,'vf_ave','horiz ave v filter','m s-2','e10.2',
+     *'@ma26@tiv@ma47@cr(@cga@ma65@ti^1^2v@cr)@ma4727'/
+      data mdvcde(63),mdvnme(63),mdvstr(63),mdvunt(63),mdvfmt(63),
+     *     mdvppl(63)
+     *     /MDWFAVE,'wf_ave','horiz ave w filter','m s-2','e10.2',
+     *'@ma26@tiw@ma47@cr(@cga@ma65@ti^1^2w@cr)@ma4727'/
+      data mdvcde(64),mdvnme(64),mdvstr(64),mdvunt(64),mdvfmt(64),
+     *     mdvppl(64)
+     *     /MDPAVE,'p_ave','pressure transport term','m2 s-3','e10.2',
+     *'@ma26@tiu_i\@ma4764@tiP@ma1964@tix_i@ma27'/
+      data mdvcde(65),mdvnme(65),mdvstr(65),mdvunt(65),mdvfmt(65),
+     *     mdvppl(65)
+     *     /MDAAVE,'a_ave','advection term','m2 s-3','e10.2',
+     *'@ma26@tiu_i\@ma47@tiu_j@ma64@tiu_i@ma1964@tix_j@ma27'/
+      data mdvcde(66),mdvnme(66),mdvstr(66),mdvunt(66),mdvfmt(66),
+     *     mdvppl(66)
+     *     /MDBAVE,'b_ave','buoyancy term','m2 s-3','e10.2',
+     *'@ma26@tiw@ma47@tig@cr(@cgr@ma4719@cgr@ti_0@cr)@ma27'/
+      data mdvcde(67),mdvnme(67),mdvstr(67),mdvunt(67),mdvfmt(67),
+     *     mdvppl(67)
+     *     /MDSGAVE,'sg_ave','subgrid transport term','m2 s-3','e10.2',
+     *'@ma26@tiu_i\@ma476426@tiu_i\"u_j\"@ma27@ti_s_g_s@ma1964@tix_j@ma2
+     *7'/
+      data mdvcde(68),mdvnme(68),mdvstr(68),mdvunt(68),mdvfmt(68),
+     *     mdvppl(68)
+     *     /MDSDAVE,'sd_ave','stokes drift term','m2 s-3','e10.2',
+     *'@ma26@tiu_i\@ma47@cr(@cge@ti_i_j_ku_j\^s@cgz@ti_k@cr)@ma4727'/
+      data mdvcde(69),mdvnme(69),mdvstr(69),mdvunt(69),mdvfmt(69),
+     *     mdvppl(69)
+     *     /MDUWAVE,'uw_ave','vertical u flux','m2 s-2','e10.2',
+     *'@ma26@tiu@ma47@tiw@ma4727'/
+      data mdvcde(70),mdvnme(70),mdvstr(70),mdvunt(70),mdvfmt(70),
+     *     mdvppl(70)
+     *     /MDVWAVE,'vw_ave','vertical v flux','m2 s-2','e10.2',
+     *'@ma26@tiv@ma47@tiw@ma4727 '/
+      data mdvcde(71),mdvnme(71),mdvstr(71),mdvunt(71),mdvfmt(71),
+     *     mdvppl(71)
+     *     /MDSPAVE,'sp_ave','shear production term','m2 s-3','e10.2',
+     *'@ma26@tiu_i\@ma47@tiw@ma472764@tiu\^-_i@ma1964@tiz'/
+      data mdvcde(72),mdvnme(72),mdvstr(72),mdvunt(72),mdvfmt(72),
+     *     mdvppl(72)
+     *     /MDUADCP,'u_adcp','adcp u','m s-1','e10.2',
+     *'@asu_adcp'/
+      data mdvcde(73),mdvnme(73),mdvstr(73),mdvunt(73),mdvfmt(73),
+     *     mdvppl(73)
+     *     /MDVADCP,'v_adcp','adcp v','m s-1','e10.2',
+     *'@asv_adcp'/
+      data mdvcde(74),mdvnme(74),mdvstr(74),mdvunt(74),mdvfmt(74),
+     *     mdvppl(74)
+     *     /MDTPNT,'t_pnt','temperature at x=0,y=0','degC','f6.2',
+     *'@ast_pnt'/
+      data mdvcde(75),mdvnme(75),mdvstr(75),mdvunt(75),mdvfmt(75),
+     *     mdvppl(75)
+     *     /MDSPNT,'s_pnt','salinity at x=0,y=0','ppt','f6.2',
+     *'@ass_pnt'/
+      data mdvcde(76),mdvnme(76),mdvstr(76),mdvunt(76),mdvfmt(76),
+     *     mdvppl(76)
+     *     /MDUSTAR,'u_star','stress velocity scale','m s-1','e10.2',
+     *'@tiu_*'/
+      data mdvcde(77),mdvnme(77),mdvstr(77),mdvunt(77),mdvfmt(77),
+     *     mdvppl(77)
+     *     /MDS0,'S_0','Stokes drift velocity','m s-1','e10.2',
+     *'@tiS_0'/
+      data mdvcde(78),mdvnme(78),mdvstr(78),mdvunt(78),mdvfmt(78),
+     *     mdvppl(78)
+     *     /MDLA,'L_a','Langmuir number',' ','e10.2',
+     *'@tiLa'/
+      data mdvcde(79),mdvnme(79),mdvstr(79),mdvunt(79),mdvfmt(79),
+     *     mdvppl(79)
+     *     /MDKMAVE,'km_ave','horiz ave km','m2 s-1','e10.2',
+     *'@ma26@tiK_m@ma27'/
+      data mdvcde(80),mdvnme(80),mdvstr(80),mdvunt(80),mdvfmt(80),
+     *     mdvppl(80)
+     *     /MDNULL,' ',' ',' ',' ',' '/
+      data mdvcde(81),mdvnme(81),mdvstr(81),mdvunt(81),mdvfmt(81),
+     *     mdvppl(81)
+     *     /MDHICE,'hice','ice depth','m','f6.2',
+     *'@ashice'/
+      data mdvcde(82),mdvnme(82),mdvstr(82),mdvunt(82),mdvfmt(82) ,
+     *     mdvppl(82)
+     *     /MDTICE,'tice','ice temperature','degC','f6.2',
+     *'@astice'/
+      data mdvcde(83),mdvnme(83),mdvstr(83),mdvunt(83),mdvfmt(83) ,
+     *     mdvppl(83)
+     *     /MDSICE,'sice','ice salinity','ppt','f6.2',
+     *'@assice'/
+      data mdvcde(84),mdvnme(84),mdvstr(84),mdvunt(84),mdvfmt(84) ,
+     *     mdvppl(84)
+     *     /MDVBR,'vbr','ice brine volume',' ','f6.2',
+     *'@asvbr'/
+      data mdvcde(85),mdvnme(85),mdvstr(85),mdvunt(85),mdvfmt(85) ,
+     *     mdvppl(85)
+     *     /MDCFR,'cfr','frazil ice concentration',' ','f6.2',
+     *'@ascfr'/
+      data mdvcde(86),mdvnme(86),mdvstr(86),mdvunt(86),mdvfmt(86),
+     *     mdvppl(86)
+     *     /MDFICE,'fice','ice bottom heat flux','W m-2','e10.2',
+     *'@asfice'/
+      data mdvcde(87),mdvnme(87),mdvstr(87),mdvunt(87),mdvfmt(87),
+     *     mdvppl(87)
+     *     /MDSFICE,'sfice','ice salinity flux','ppt s-1','e10.2',
+     *'@assfice'/
+      data mdvcde(88),mdvnme(88),mdvstr(88),mdvunt(88),mdvfmt(88),
+     *     mdvppl(88)
+     *     /MDPE,'pe','total potential energy','kg m2 s-2','e10.2',
+     *'@aspe'/
+      data mdvcde(89),mdvnme(89),mdvstr(89),mdvunt(89),mdvfmt(89),
+     *     mdvppl(89)
+     *     /MDPET,'pet','T potential energy','kg m2 s-2','e10.2',
+     *'@aspet'/
+#if defined(BACKPE)
+      data mdvcde(90),mdvnme(90),mdvstr(90),mdvunt(90),mdvfmt(90),
+     *     mdvppl(90)
+     *     /MDPEW,'pew','W potential energy','kg m2 s-2','e10.2',
+     *'@aspew'/
+#else
+      data mdvcde(90),mdvnme(90),mdvstr(90),mdvunt(90),mdvfmt(90),
+     *     mdvppl(90)
+     *     /MDPEW,'wp_ave','pressure work','m2 s-3','e10.2',
+     *'@ma26@tiw@ma47@tip@ma4727'/
+#endif
+      data mdvcde(91),mdvnme(91),mdvstr(91),mdvunt(91),mdvfmt(91),
+     *     mdvppl(91)
+     *     /MDSIG,'dpesg','subgrid PE change','m2 s-3','e10.2',
+     *'@asdpesg'/
+      data mdvcde(92),mdvnme(92),mdvstr(92),mdvunt(92),mdvfmt(92),
+     *     mdvppl(92)
+     *     /MDDISP,'disp_ave','dissipation rate','m2 s-3','e10.2',
+     *'@cge'/
+      data mdvcde(93),mdvnme(93),mdvstr(93),mdvunt(93),mdvfmt(93),
+     *     mdvppl(93)
+     *     /MDLWFT,'lwf_top','long wave heat flux','W m-2','e10.2',
+     *'@tiR_L'/
+      data mdvcde(94),mdvnme(94),mdvstr(94),mdvunt(94),mdvfmt(94),
+     *     mdvppl(94)
+     *     /MDSHFT,'shf_top','sensible heat flux','W m-2','e10.2',
+     *'@tiQ_S'/
+      data mdvcde(95),mdvnme(95),mdvstr(95),mdvunt(95),mdvfmt(95),
+     *     mdvppl(95)
+     *     /MDSLPRESS,'slpress','sea level pressure','hPa','e10.2',
+     *'@asslpress'/
+      data mdvcde(96),mdvnme(96),mdvstr(96),mdvunt(96),mdvfmt(96),
+     *     mdvppl(96)
+     *     /MDATEMP,'a_temp','air temperature','degC','e10.2',
+     *'@tiT_a'/
+      data mdvcde(97),mdvnme(97),mdvstr(97),mdvunt(97),mdvfmt(97),
+     *     mdvppl(97)
+     *     /MDWTEMP,'w_temp','sea surface temperature','degC','e10.2',
+     *'@tiT_s'/
+      data mdvcde(98),mdvnme(98),mdvstr(98),mdvunt(98),mdvfmt(98),
+     *     mdvppl(98)
+     *     /MDUWND,'u_wind','u wind','m s-1','e10.2',
+     *'@tiu_w'/
+      data mdvcde(99),mdvnme(99),mdvstr(99),mdvunt(99),mdvfmt(99),
+     *     mdvppl(99)
+     *     /MDVWND,'v_wind','v wind','m s-1','e10.2',
+     *'@tiv_w'/
+c
+      Data mdvlen/99/

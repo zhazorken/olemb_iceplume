@@ -1,0 +1,74 @@
+      subroutine obcmom(rv)
+c
+c    $Id: imag.F,v 1.6 1998/10/21 21:56:38 dwd Exp $
+c
+c this routine sets the lateral image points
+c
+#if defined(USEMPI)
+      include 'mpif.h'
+#endif
+#include "param.inc"
+#include "olemp.inc"
+#include "olemf.inc"
+#include "cyclic.inc"
+#include "olemtke.inc"
+#include "moddef.inc"
+#include "communicate.inc"
+#if defined(ICE)
+#include "ice.inc"
+#endif
+#include "finitv.inc"
+c
+      real rv(0:idim1,0:jdim1,0:kdim1)
+      real vblm,vbrm,zpgr,ypgr
+      real vr,vl,cd
+      integer i,j,k,olev,ierr
+c
+      if((blockstart(my_pe+1)+jdim).ge.jtotal) then
+        j = jdim1
+        do i=0,idim1
+          do k=0,kdim1
+c
+c wall or zero gradient boundary condition
+c
+            v(i,j,k) = 0.0
+            v(i,j-1,k) = 0.0
+            u(i,j,k) = u(i,j-1,k)
+            w(i,j,k) = w(i,j-1,k)
+            if(k.eq.0.or.k.eq.1) then
+              w(i,j,k) = 0.0
+            endif
+            p(i,j,k) = p(i,j-1,k)
+          enddo
+        enddo
+      endif
+c   
+
+      call MPI_BARRIER(comm,ierr)
+      
+c
+      if(blockstart(my_pe+1).eq.1) then
+c 
+        do i=0,idim1
+          do k=0,kdim1
+c 
+c 
+         j = 1
+c
+c do wall bc
+c
+           u(i,0,k) = u(i,1,k)
+           v(i,0,k) = 0.0
+           v(i,1,k) = 0.0
+           w(i,0,1) = w(i,0,1)
+           p(i,0,k) = p(i,1,k)
+
+          enddo
+        enddo
+c
+      endif
+      call MPI_BARRIER(comm,ierr)
+c 
+c
+      return
+      end

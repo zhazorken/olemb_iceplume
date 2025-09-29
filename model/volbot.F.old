@@ -1,0 +1,88 @@
+      subroutine volbot(hght)
+#include "param.inc"
+#include "finitv.inc"
+#include "olemp.inc"
+c
+c This routine computes the finite element volume and cell boundary area
+c given a 2-D terrain array
+c
+      real hght(0:idim1,0:jdim1)
+      real tmpp(0:idim1,0:jdim1)
+c      real frac(0:idim1,0:jdim1)
+c      integer kdist(0:idim1,0:jdim1)
+      integer i,j,k,kmin,junk
+c
+c first calculate the grid level for the terrain at each point and the
+c fractional distance (or volume) left in the grid cell
+c
+c set ktop to kdim1, this will need adjustment for bottom terrain
+c
+c
+c
+      do k=0,kdim1
+        do j=0,jdim1
+          do i=0,idim1
+            ax(i,j,k) = 1.0
+            ay(i,j,k) = 1.0
+            frac(i,j) = 0.0
+            kdist(i,j) = 0
+          enddo
+        enddo
+      enddo
+c
+      do i=1,idim
+        do j=1,jdim
+          kdist(i,j) = int(hght(i,j)/dz)
+          frac(i,j) = hght(i,j)/dz-kdist(i,j)
+          if(frac(i,j).lt.0.5) then
+            frac(i,j) = 0.0
+          else if (frac(i,j).gt.0.5) then
+            frac(i,j) = 0.0
+            kdist(i,j) = kdist(i,j)+1
+          endif
+          kdist(i,j) = kdist(i,j)+1
+        enddo
+c        write(*,*)"kdist,frac sample ",kdist(i,1),frac(i,1)
+      enddo
+c
+c do boundaries for kdist using real imag2d
+c
+      do j=1,jdim
+        do i=1,idim
+          tmpp(i,j) = kdist(i,j)
+        enddo
+      enddo
+      call imag2d(tmpp)
+      do j=0,jdim1
+        do i=0,idim1
+          kdist(i,j) = nint(tmpp(i,j))
+        enddo
+      enddo
+c
+c
+      call imag2d(frac)
+c
+c
+      do i=1,idim
+        do j=1,jdim
+          if(kdist(i,j).gt.1) then
+          do k=0,kdist(i,j)-1
+            ax(i,j,k) = 0.0
+            ay(i,j,k) = 0.0
+            ax(i+1,j,k) = 0.0
+            ay(i,j+1,k) = 0.0
+          enddo
+          endif
+c          ax(i,j,0) = 0.0
+c          ay(i,j,0) = 0.0
+c          if(j.eq.jdim/2) then
+c            write(*,*)"kdist, ax ", kdist(i,j),
+c     *                ax(i,j,k)
+c          endif
+        enddo
+      enddo
+c      read(*,*)junk
+      call imag(ax)
+      call imag(ay)
+      return
+      end
