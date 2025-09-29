@@ -1,0 +1,843 @@
+      subroutine dag_create(froot)
+c
+c   $Id: dag_create.F,v 1.7 1998/11/04 00:25:32 dwd Exp $
+c
+#include "moddef.inc"
+c
+#include "param.inc"
+#include "olemp.inc"
+#include "olemcdf.inc"
+#include "olemi.inc"
+#include "olemf.inc"
+#include "cyclic.inc"
+#include "olemtke.inc"
+#include "netcdf.inc"
+#include "refdate.inc"
+c 
+      character froot*80,name*15,str*30,tunits*80,hold*2
+      integer cdfout
+      integer lnblk,k,iii,j,ilen,i,tlen,ival
+      integer rcode,varid(4),varidu(4),varidw(4),varidp(4)
+      integer varidv(4),varidzu(4),varidzw(4)
+      integer xudim,xwdim,ydim,zudim,zwdim,tdim,xdim,zdim
+      integer zzudim,zzwdim
+      integer yudim,yvdim,yuid,yvid
+      integer xuid,xwid,yid,zuid,zwid,xid,zid
+      integer zzuid,zzwid
+      real xu,xw,zu,zw,yu,yv,x,y
+      real zzu(kdim),zzw(kdim1)
+#if defined(ALLOC_DISK)
+      integer tpoints
+#endif
+c
+      integer eplat,eplon,eppres,eptime
+      data eplat,eplon,eppres,eptime/500,501,1,625/
+c
+C-----create cdf file (CDF)
+c
+      j=lnblk(froot,80)
+      timid=nccre(froot(1:j)//'_dag.nc',ncclob,rcode)
+c
+      if(datemode) then
+         call frmtdate(refdate, str)
+         tunits = 'seconds' // ' since ' // str
+         tlen = lnblk(tunits, 80)
+      else
+         tunits = 'seconds'
+         tlen = 7
+      endif
+c
+C-----define dimensions
+c
+      cdfout=timid
+      xudim=ncddef(cdfout,'xu',1,rcode)
+      xuid =ncvdef(cdfout,'xu',NCFLOAT,1,xudim,rcode)
+      call ncapt(cdfout, xuid, 'epic_code', NCLONG, 1, EPLON, rcode)
+      call ncaptc(cdfout, xuid, 'FORTRAN_format', NCCHAR,
+     *     4,'f6.2', rcode)
+      call ncaptc(cdfout, xuid, 'units', NCCHAR, 1, 'm', rcode)
+      call ncaptc(cdfout, xuid, 'type' , NCCHAR, 4, 'EVEN', rcode)
+c
+      yudim=ncddef(cdfout,'yu',1,rcode)
+      yuid  = ncvdef(cdfout, 'yu', NCFLOAT, 1, yudim, rcode)
+      call ncapt(cdfout, yuid, 'epic_code', NCLONG, 1, EPLAT, rcode)
+      call ncaptc(cdfout, yuid, 'FORTRAN_format', NCCHAR,
+     *     4,'f6.2', rcode)
+      call ncaptc(cdfout, yuid, 'units', NCCHAR, 1, 'm', rcode)
+      call ncaptc(cdfout, yuid, 'type' , NCCHAR, 4, 'EVEN', rcode)
+c
+      zudim=ncddef(cdfout,'zu',1,rcode)
+      zuid  = ncvdef(cdfout, 'zu', NCFLOAT, 1, zudim, rcode)
+      call ncapt(cdfout, zuid, 'epic_code', NCLONG, 1, EPPRES, rcode)
+      call ncaptc(cdfout, zuid, 'FORTRAN_format', NCCHAR,
+     *     4,'f6.2', rcode)
+      call ncaptc(cdfout, zuid, 'units', NCCHAR, 1, 'm', rcode)
+      call ncaptc(cdfout, zuid, 'type' , NCCHAR, 4, 'EVEN', rcode)
+c
+      xwdim=ncddef(cdfout,'xw',1,rcode)
+      xwid  = ncvdef(cdfout, 'xw', NCFLOAT, 1, xwdim, rcode)
+      call ncapt(cdfout, xwid, 'epic_code', NCLONG, 1, EPLON, rcode)
+      call ncaptc(cdfout, xwid, 'FORTRAN_format', NCCHAR,
+     *     4,'f6.2', rcode)
+      call ncaptc(cdfout, xwid, 'units', NCCHAR, 1, 'm', rcode)
+      call ncaptc(cdfout, xwid, 'type' , NCCHAR, 4, 'EVEN', rcode)
+c
+      yvdim=ncddef(cdfout,'yv',1,rcode)
+      yvid  = ncvdef(cdfout, 'yv', NCFLOAT, 1, yvdim, rcode)
+      call ncapt(cdfout, yvid, 'epic_code', NCLONG, 1, EPLAT, rcode)
+      call ncaptc(cdfout, yvid, 'FORTRAN_format', NCCHAR,
+     *     4,'f6.2', rcode)
+      call ncaptc(cdfout, yvid, 'units', NCCHAR, 1, 'm', rcode)
+      call ncaptc(cdfout, yvid, 'type' , NCCHAR, 4, 'EVEN', rcode)
+c
+      zwdim=ncddef(cdfout,'zw',1,rcode)
+      zwid  = ncvdef(cdfout, 'zw', NCFLOAT, 1, zwdim, rcode)
+      call ncapt(cdfout, zwid, 'epic_code', NCLONG, 1, EPPRES, rcode)
+      call ncaptc(cdfout, zwid, 'FORTRAN_format', NCCHAR,
+     *     4,'f6.2', rcode)
+      call ncaptc(cdfout, zwid, 'units', NCCHAR, 1, 'm', rcode)
+      call ncaptc(cdfout, zwid, 'type' , NCCHAR, 4, 'EVEN', rcode)
+c
+      zzudim=ncddef(cdfout,'zzu',kdim,rcode)
+      zzuid = ncvdef(cdfout, 'zzu', NCFLOAT, 1, zzudim, rcode)
+      call ncapt(cdfout, zzuid, 'epic_code', NCLONG, 1, EPPRES, rcode)
+      call ncaptc(cdfout, zzuid, 'FORTRAN_format', NCCHAR,
+     *     4,'f6.2', rcode)
+      call ncaptc(cdfout, zzuid, 'units', NCCHAR, 1, 'm', rcode)
+      call ncaptc(cdfout, zzuid, 'type' , NCCHAR, 4, 'EVEN', rcode)
+c
+      zzwdim=ncddef(cdfout,'zzw',kdim1,rcode)
+      zzwid = ncvdef(cdfout, 'zzw', NCFLOAT, 1, zzwdim, rcode)
+      call ncapt(cdfout, zzwid, 'epic_code', NCLONG, 1, EPPRES, rcode)
+      call ncaptc(cdfout, zzwid, 'FORTRAN_format', NCCHAR,
+     *     4,'f6.2', rcode)
+      call ncaptc(cdfout, zzwid, 'units', NCCHAR, 1, 'm', rcode)
+      call ncaptc(cdfout, zzwid, 'type' , NCCHAR, 4, 'EVEN', rcode)
+c
+      xdim=ncddef(cdfout,'x',1,rcode)
+      xid   = ncvdef(cdfout, 'x', NCFLOAT, 1, xdim, rcode)
+      call ncapt(cdfout, xid, 'epic_code', NCLONG, 1, EPLON, rcode)
+      call ncaptc(cdfout, xid, 'FORTRAN_format', NCCHAR,
+     *     4,'f6.2', rcode)
+      call ncaptc(cdfout, xid, 'units', NCCHAR, 1, 'm', rcode)
+      call ncaptc(cdfout, xid, 'type' , NCCHAR, 4, 'EVEN', rcode)
+c
+      ydim=ncddef(cdfout,'y',1,rcode)
+      yid   = ncvdef(cdfout, 'y', NCFLOAT, 1, ydim, rcode)
+      call ncapt(cdfout, yid, 'epic_code', NCLONG, 1, EPLAT, rcode)
+      call ncaptc(cdfout, yid, 'FORTRAN_format', NCCHAR,
+     *     4,'f6.2', rcode)
+      call ncaptc(cdfout, yid, 'units', NCCHAR, 1, 'm', rcode)
+      call ncaptc(cdfout, yid, 'type' , NCCHAR, 4, 'EVEN', rcode)
+c
+      zdim=ncddef(cdfout,'z',1,rcode)
+      zid   = ncvdef(cdfout, 'z', NCFLOAT, 1, zdim, rcode)
+      call ncapt(cdfout, zid, 'epic_code', NCLONG, 1, EPPRES, rcode)
+      call ncaptc(cdfout, zid, 'FORTRAN_format', NCCHAR,
+     *     4,'f6.2', rcode)
+      call ncaptc(cdfout, zid, 'units', NCCHAR, 1, 'm', rcode)
+      call ncaptc(cdfout, zid, 'type' , NCCHAR, 4, 'EVEN', rcode)
+c
+#if defined(ALLOC_DISK)
+      tpoints=(ntime-nstart+1)/ndiag+1
+      tdim=ncddef(cdfout,'time',tpoints,rcode)
+#else
+      tdim=ncddef(cdfout,'time',NCUNLIM,rcode)
+#endif
+      ttid   = ncvdef(cdfout, 'time', NCLONG, 1, tdim, rcode)
+      if(.not.datemode) then
+         call ncapt(cdfout, ttid, 'epic_code', NCLONG, 1, 
+     *        EPTIME, rcode)
+      endif
+      call ncaptc(cdfout, ttid, 'FORTRAN_format', NCCHAR,
+     *     3,'i10', rcode)
+      call ncaptc(cdfout, ttid, 'units', NCCHAR, tlen, tunits,rcode)
+      call ncaptc(cdfout, ttid, 'type' , NCCHAR, 1, ' ', rcode)
+c
+c
+C-----define cell-centered variables (CDF)
+      varid(1)=xwdim
+      varid(2)=yudim
+      varid(3)=zudim
+      varid(4)=tdim
+
+C-----define u variable (shifted to left of center) (CDF)
+      varidu(1)=xudim
+      varidu(2)=yudim
+      varidu(3)=zudim
+      varidu(4)=tdim
+
+C-----define v variable
+      varidv(1)=xwdim
+      varidv(2)=yvdim
+      varidv(3)=zudim
+      varidv(4)=tdim
+      
+C-----define w variable (shifted to bottom of center) (CDF)
+      varidw(1)=xwdim
+      varidw(2)=yudim
+      varidw(3)=zwdim
+      varidw(4)=tdim
+
+c
+      varidzu(1)=xdim
+      varidzu(2)=ydim
+      varidzu(3)=zzudim
+      varidzu(4)=tdim
+c
+      varidzw(1)=xdim
+      varidzw(2)=ydim
+      varidzw(3)=zzwdim
+      varidzw(4)=tdim
+
+C-----define non-coordinate variables
+      varidp(1)=xdim
+      varidp(2)=ydim
+      varidp(3)=zdim
+      varidp(4)=tdim
+
+C---- set attributes
+c
+C----     set attributes for u
+c
+      call varnme(MDUVEL,name)
+      ilen=lnblk(name,15)
+      utid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidu,rcode)
+      call setvar(MDUVEL,cdfout,utid)
+c
+C----     set attributes for v
+c
+      call varnme(MDVVEL,name)
+      ilen=lnblk(name,15)
+      vtid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidv,rcode)
+      call setvar(MDVVEL,cdfout,vtid)
+c
+C----    set attributes for w
+c
+      call varnme(MDWVEL,name)
+      ilen=lnblk(name,15)
+      wtid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidw,rcode)
+      call setvar(MDWVEL,cdfout,wtid)
+c
+C----    set attributes for p_p
+c
+      call varnme(MDPRES,name)
+      ilen=lnblk(name,15)
+      ptid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varid,rcode)
+      call setvar(MDPRES,cdfout,ptid)
+c
+C----    set attributes for t
+c
+      call varnme(MDTEMP,name)
+      ilen=lnblk(name,15)
+      thtid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varid,rcode)
+      call setvar(MDTEMP,cdfout,thtid)
+c
+C----    set attributes for s
+c
+      call varnme(MDSAL,name)
+      ilen=lnblk(name,15)
+      saltid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varid,rcode)
+      call setvar(MDSAL,cdfout,saltid)
+c
+C----    set attributes for tke
+c
+      call varnme(MDTKE,name)
+      ilen=lnblk(name,15)
+      tketid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varid,rcode)
+      call setvar(MDTKE,cdfout,tketid)
+c
+C----    set attributes for rho_p
+c
+      call varnme(MDRHO,name)
+      ilen=lnblk(name,15)
+      rho_ptid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varid,rcode)
+      call setvar(MDRHO,cdfout,rho_ptid)
+c
+c set attributes for kh
+c
+      call varnme(MDKH,name)
+      ilen=lnblk(name,15)
+      khtid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varid,rcode)
+      call setvar(MDKH,cdfout,khtid)
+c
+c set attributes for km
+c
+      call varnme(MDKM,name)
+      ilen=lnblk(name,15)
+      kmtid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varid,rcode)
+      call setvar(MDKM,cdfout,kmtid)
+c
+c set attributes for tracers
+c
+      do 980 k=1,ntrace
+         write(str,994)k
+ 994     format('trcr',i1)
+         call varnme(MDTRCR+k,name)
+         ilen=lnblk(name,15)
+         trcrtid(k)=ncvdef(cdfout,str,NCFLOAT,4,varid,rcode)
+         call setvar(MDTRCR+k,cdfout,trcrtid(k))
+ 980  continue
+c
+c set attributes for mixed layer depth
+c
+      call varnme(MDZI,name)
+      ilen=lnblk(name,15)
+      zitid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidp,rcode)
+      call setvar(MDZI,cdfout,zitid)
+c
+c set attributes for w_star
+c
+      call varnme(MDWSTAR,name)
+      ilen=lnblk(name,15)
+      w_startid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidp,rcode)
+      call setvar(MDWSTAR,cdfout,w_startid)
+c
+c set attributes for u_star
+c
+      call varnme(MDUSTAR,name)
+      ilen=lnblk(name,15)
+      u_startid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidp,rcode)
+      call setvar(MDUSTAR,cdfout,u_startid)
+c
+c set attributes for t_star
+c
+      call varnme(MDTSTAR,name)
+      ilen=lnblk(name,15)
+      t_startid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidp,rcode)
+      call setvar(MDTSTAR,cdfout,t_startid)
+c
+c set attributes for q
+c
+      call varnme(MDQ,name)
+      ilen=lnblk(name,15)
+      qtid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidp,rcode)
+      call setvar(MDQ,cdfout,qtid)
+c
+c set attributes for boundary condition variables
+c
+c      if(bcon) then
+c
+c set attributes for hf_top
+c
+         if(heaton) then
+            call varnme(MDHFT,name)
+            ilen=lnblk(name,15)
+            hf_toptid=ncvdef(cdfout,name(:ilen),NCFLOAT,
+     *           4,varidp,rcode)
+            call setvar(MDHFT,cdfout,hf_toptid)
+         endif
+c
+c set attributes for ustr_t
+c
+         if(uston) then
+            call varnme(MDUSTT,name)
+            ilen=lnblk(name,15)
+            ustr_ttid=ncvdef(cdfout,name(:ilen),NCFLOAT,
+     *           4,varidp,rcode)
+            call setvar(MDUSTT,cdfout,ustr_ttid)
+         endif
+c
+c set attributes for vstr_t
+c
+         if(vston) then
+            call varnme(MDVSTT,name)
+            ilen=lnblk(name,15)
+            vstr_ttid=ncvdef(cdfout,name(:ilen),NCFLOAT,
+     *           4,varidp,rcode)
+            call setvar(MDVSTT,cdfout,vstr_ttid)
+         endif
+c
+c set attributes for swf_top
+c
+         if(swheaton) then
+            call varnme(MDSWHFT,name)
+            ilen=lnblk(name,15)
+            swf_toptid=ncvdef(cdfout,name(:ilen),NCFLOAT,
+     *           4,varidp,rcode)
+            call setvar(MDSWHFT,cdfout,swf_toptid)
+         endif
+c
+c set attributes for rain
+c
+         if(rainon) then
+            call varnme(MDRAIN,name)
+            ilen=lnblk(name,15)
+            raintid=ncvdef(cdfout,name(:ilen),NCFLOAT,
+     *           4,varidp,rcode)
+            call setvar(MDRAIN,cdfout,raintid)
+         endif
+c
+c set attributes for lhf_top
+c
+         if(lheaton) then
+            call varnme(MDLHFT,name)
+            ilen=lnblk(name,15)
+            lhf_toptid=ncvdef(cdfout,name(:ilen),NCFLOAT,
+     *           4,varidp,rcode)
+            call setvar(MDLHFT,cdfout,lhf_toptid)
+         endif
+#if defined(STOKES)
+c
+c set attributes for wave_l
+c
+         if(wavelon) then
+            call varnme(MDWAVEL,name)
+            ilen=lnblk(name,15)
+            wave_ltid=ncvdef(cdfout,name(:ilen),NCFLOAT,
+     *           4,varidp,rcode)
+            call setvar(MDWAVEL,cdfout,wave_ltid)
+         endif
+c
+c set attributes for wave_h
+c
+         if(wavehon) then
+            call varnme(MDWAVEH,name)
+            ilen=lnblk(name,15)
+            wave_htid=ncvdef(cdfout,name(:ilen),NCFLOAT,
+     *           4,varidp,rcode)
+            call setvar(MDWAVEH,cdfout,wave_htid)
+         endif
+c
+c set attributes for w_angle
+c
+         if(angleon) then
+            call varnme(MDANGLE,name)
+            ilen=lnblk(name,15)
+            w_angletid=ncvdef(cdfout,name(:ilen),NCFLOAT,
+     *           4,varidp,rcode)
+            call setvar(MDANGLE,cdfout,w_angletid)
+         endif
+c
+c set attributes for S_0
+c
+         call varnme(MDS0,name)
+         ilen=lnblk(name,15)
+         S_0tid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidp,rcode)
+         call setvar(MDS0,cdfout,S_0tid)
+c
+c set attributes for L_a
+c
+         call varnme(MDLA,name)
+         ilen=lnblk(name,15)
+         L_atid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidp,rcode)
+         call setvar(MDLA,cdfout,L_atid)
+#endif
+c      endif
+c
+c set attributes for t_bar
+c
+      call varnme(MDTBAR,name)
+      ilen=lnblk(name,15)
+      t_bartid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidp,rcode)
+      call setvar(MDTBAR,cdfout,t_bartid)
+c
+c set attributes for s_bar
+c
+      call varnme(MDSBAR,name)
+      ilen=lnblk(name,15)
+      s_bartid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidp,rcode)
+      call setvar(MDSBAR,cdfout,s_bartid)
+c
+c set attributes for the average quatities
+c
+c set attributes for t_ave
+c
+      call varnme(MDTAVE,name)
+      ilen=lnblk(name,15)
+      t_avetid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidzu,rcode)
+      call setvar(MDTAVE,cdfout,t_avetid)
+c
+c set attributes for t2_ave
+c
+      call varnme(MDT2AVE,name)
+      ilen=lnblk(name,15)
+      t2_avetid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidzu,rcode)
+      call setvar(MDT2AVE,cdfout,t2_avetid)
+c
+c set attributes for s_ave
+c
+      call varnme(MDSAVE,name)
+      ilen=lnblk(name,15)
+      s_avetid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidzu,rcode)
+      call setvar(MDSAVE,cdfout,s_avetid)
+c
+c set attributes for s2_ave
+c
+      call varnme(MDS2AVE,name)
+      ilen=lnblk(name,15)
+      s2_avetid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidzu,rcode)
+      call setvar(MDS2AVE,cdfout,s2_avetid)
+c
+c set attributes for tke_ave
+c
+      call varnme(MDTKEAVE,name)
+      ilen=lnblk(name,15)
+      tke_avetid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidzu,rcode)
+      call setvar(MDTKEAVE,cdfout,tke_avetid)
+c
+c set attributes for km_ave
+c
+      call varnme(MDKMAVE,name)
+      ilen=lnblk(name,15)
+      km_avetid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidzu,rcode)
+      call setvar(MDKMAVE,cdfout,km_avetid)
+c
+c set attributes for w2_ave
+c
+      call varnme(MDW2AVE,name)
+      ilen=lnblk(name,15)
+      w2_avetid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidzw,rcode)
+      call setvar(MDW2AVE,cdfout,w2_avetid)
+c
+c set attributes for KE_ave
+c
+      call varnme(MDKEAVE,name)
+      ilen=lnblk(name,15)
+      KE_avetid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidzu,rcode)
+      call setvar(MDKEAVE,cdfout,KE_avetid)
+c
+c set attributes for wt_ave
+c
+      call varnme(MDWTAVE,name)
+      ilen=lnblk(name,15)
+      wt_avetid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidzw,rcode)
+      call setvar(MDWTAVE,cdfout,WT_avetid)
+c
+c set attributes for ws_ave
+c
+      call varnme(MDWSAVE,name)
+      ilen=lnblk(name,15)
+      ws_avetid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidzw,rcode)
+      call setvar(MDWSAVE,cdfout,ws_avetid)
+c
+c set attributes for wrho_ave
+c
+      call varnme(MDWRHOAVE,name)
+      ilen=lnblk(name,15)
+      wrho_avetid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidzu,rcode)
+      call setvar(MDWRHOAVE,cdfout,wrho_avetid)
+c
+c set attributes for rhop_ave
+c
+      call varnme(MDRHOPAVE,name)
+      ilen=lnblk(name,15)
+      rhop_avetid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidzu,rcode)
+      call setvar(MDRHOPAVE,cdfout,rhop_avetid)
+c
+c set attributes for u_ave
+c
+      call varnme(MDUAVE,name)
+      ilen=lnblk(name,15)
+      u_avetid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidzu,rcode)
+      call setvar(MDUAVE,cdfout,u_avetid)
+c
+c set attributes for v_ave
+c
+      call varnme(MDVAVE,name)
+      ilen=lnblk(name,15)
+      v_avetid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidzu,rcode)
+      call setvar(MDVAVE,cdfout,v_avetid)
+c
+c set attributes for u2_ave
+c
+      call varnme(MDU2AVE,name)
+      ilen=lnblk(name,15)
+      u2_avetid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidzu,rcode)
+      call setvar(MDU2AVE,cdfout,u2_avetid)
+c
+c set attributes for v2_ave
+c
+      call varnme(MDV2AVE,name)
+      ilen=lnblk(name,15)
+      v2_avetid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidzu,rcode)
+      call setvar(MDV2AVE,cdfout,v2_avetid)
+c
+c set attributes for hf_ave
+c
+      call varnme(MDHFAVE,name)
+      ilen=lnblk(name,15)
+      hf_avetid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidzw,rcode)
+      call setvar(MDHFAVE,cdfout,hf_avetid)
+c
+c set attributes for rhof_ave
+c
+      call varnme(MDRHOFAVE,name)
+      ilen=lnblk(name,15)
+      rhof_avetid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidzu,rcode)
+      call setvar(MDRHOFAVE,cdfout,rhof_avetid)
+c
+c set attributes for sf_ave
+c
+      call varnme(MDSFAVE,name)
+      ilen=lnblk(name,15)
+      sf_avetid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidzw,rcode)
+      call setvar(MDSFAVE,cdfout,sf_avetid)
+c
+c set attributes for p2_ave
+c
+      call varnme(MDP2AVE,name)
+      ilen=lnblk(name,15)
+      p2_avetid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidzu,rcode)
+      call setvar(MDP2AVE,cdfout,p2_avetid)
+c
+c set attributes for uf_ave
+c
+      call varnme(MDUFAVE,name)
+      ilen=lnblk(name,15)
+      ufilt_avetid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidzu,rcode)
+      call setvar(MDUFAVE,cdfout,ufilt_avetid)
+c
+c set attributes for vf_ave
+c
+      call varnme(MDVFAVE,name)
+      ilen=lnblk(name,15)
+      vfilt_avetid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidzu,rcode)
+      call setvar(MDVFAVE,cdfout,vfilt_avetid)
+c
+c set attributes for wf_ave
+c
+      call varnme(MDWFAVE,name)
+      ilen=lnblk(name,15)
+      wfilt_avetid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidzu,rcode)
+      call setvar(MDWFAVE,cdfout,wfilt_avetid)
+c
+c set attributes for disp_ave
+c
+c      call varnme(MDWFAVE,name)
+c      ilen=lnblk(name,15)
+c      uf_avetid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidzu,rcode)
+c      call setvar(MDUFAVE,cdfout,uf_avetid)
+c
+c set attributes for p_ave
+c
+      call varnme(MDPAVE,name)
+      ilen=lnblk(name,15)
+      p_avetid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidzu,rcode)
+      call setvar(MDPAVE,cdfout,p_avetid)
+c
+c set attributes for a_ave
+c
+      call varnme(MDAAVE,name)
+      ilen=lnblk(name,15)
+      a_avetid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidzu,rcode)
+      call setvar(MDAAVE,cdfout,a_avetid)
+c
+c set attributes for b_ave
+c
+      call varnme(MDBAVE,name)
+      ilen=lnblk(name,15)
+      b_avetid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidzu,rcode)
+      call setvar(MDBAVE,cdfout,b_avetid)
+c
+c set attributes for sg_ave
+c
+      call varnme(MDSGAVE,name)
+      ilen=lnblk(name,15)
+      sg_avetid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidzu,rcode)
+      call setvar(MDSGAVE,cdfout,sg_avetid)
+#if defined(STOKES)
+c
+c set attributes for sd_ave
+c
+      call varnme(MDSDAVE,name)
+      ilen=lnblk(name,15)
+      sd_avetid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidzu,rcode)
+      call setvar(MDSDAVE,cdfout,sd_avetid)
+#endif
+c
+c set attributes for uw_ave
+c
+      call varnme(MDUWAVE,name)
+      ilen=lnblk(name,15)
+      uw_avetid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidzw,rcode)
+      call setvar(MDUWAVE,cdfout,uw_avetid)
+c
+c
+c set attributes for vw_ave
+c
+      call varnme(MDVWAVE,name)
+      ilen=lnblk(name,15)
+      vw_avetid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidzw,rcode)
+      call setvar(MDVWAVE,cdfout,vw_avetid)
+c
+c set attributes for sp_ave
+c
+      call varnme(MDSPAVE,name)
+      ilen=lnblk(name,15)
+      sp_avetid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidzu,rcode)
+      call setvar(MDSPAVE,cdfout,sp_avetid)
+c
+c set attributes for pe
+c
+      call varnme(MDPE,name)
+      ilen=lnblk(name,15)
+      petid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidp,rcode)
+      call setvar(MDPE,cdfout,petid)
+c
+c set attributes for pet
+c 
+      call varnme(MDPET,name) 
+      ilen=lnblk(name,15)
+      pettid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidp,rcode) 
+      call setvar(MDPET,cdfout,pettid)
+c
+c set attributes for pe
+c 
+      call varnme(MDPEW,name) 
+      ilen=lnblk(name,15)
+      pewtid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidp,rcode) 
+      call setvar(MDPEW,cdfout,pewtid)
+c
+c set attributes for sigma average
+c
+      call varnme(MDSIG,name)
+      ilen=lnblk(name,15)
+      sig_avetid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidzu,rcode)
+      call setvar(MDSIG,cdfout,sig_avetid)
+c
+c
+      call varnme(MDDISP,name)
+      ilen=lnblk(name,15)
+      disptid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidzu,rcode)
+      call setvar(MDDISP,cdfout,disptid)
+c
+      call varnme(MDCFRA,name)
+      ilen=lnblk(name,15)
+      cfratid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidzu,rcode)
+      call setvar(MDCFRA,cdfout,cfratid)
+
+c
+      call varnme(MDWCAVE,name)
+      ilen=lnblk(name,15)
+      wctid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidzu,rcode)
+      call setvar(MDWCAVE,cdfout,wctid)
+
+      call varnme(MDHICEBC,name)
+      ilen=lnblk(name,15)
+      hbctid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidp,rcode)
+      call setvar(MDHICEBC,cdfout,hbctid)
+c
+      call varnme(MDSICEBC,name)
+      ilen=lnblk(name,15)
+      sbctid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidp,rcode)
+      call setvar(MDSICEBC,cdfout,sbctid)
+c
+      call varnme(MDCHEAT,name)
+      ilen=lnblk(name,15)
+      chtid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidzu,rcode)
+      call setvar(MDCHEAT,cdfout,chtid)
+c
+      call varnme(MDSFLUX,name)
+      ilen=lnblk(name,15)
+      sftid=ncvdef(cdfout,name(:ilen),NCFLOAT,4,varidzu,rcode)
+      call setvar(MDSFLUX,cdfout,sftid)
+c
+c
+c
+c
+c set attributes
+c
+      iii=lnblk(ident,30)
+      if(iii.gt.0) call ncaptc(cdfout,NCGLOBAL,'identifier',NCCHAR,
+     *            iii,ident,rcode)
+
+      iii=lnblk(mver,80)
+      if(iii.gt.0)call ncaptc(cdfout,NCGLOBAL,'model_version',NCCHAR,
+     *            iii,mver,rcode)
+
+      do i=1,4
+         iii=lnblk(modflags(i),80)
+         if(iii.gt.0) then
+            write(hold,'(i1)')i
+            call ncaptc(cdfout,NCGLOBAL,'model_flags'//hold,
+     *           NCCHAR, iii, modflags(i), rcode)
+         endif
+      enddo
+
+      iii=lnblk(title,80)
+      if(iii.gt.0) call ncaptc(cdfout,NCGLOBAL,'title',NCCHAR,
+     *            iii,title,rcode)
+      call ncaptc(cdfout,NCGLOBAL,'DATA_TYPE',NCCHAR,
+     *     5,'MODEL',rcode)
+      call ncaptc(cdfout,NCGLOBAL,'COORD_SYSTEM',NCCHAR,
+     *     5,'LOCAL',rcode)
+      call ncapt(cdfout,NCGLOBAL,'dx',NCFLOAT,1,dx,rcode)
+      call ncapt(cdfout,NCGLOBAL,'dy',NCFLOAT,1,dy,rcode)
+      call ncapt(cdfout,NCGLOBAL,'dz',NCFLOAT,1,dz,rcode)
+      ival = idim
+      call ncapt(cdfout,NCGLOBAL,'imax',NCLONG,1,ival,rcode)
+      ival = jdim
+      call ncapt(cdfout,NCGLOBAL,'jmax',NCLONG,1,ival,rcode)
+      ival = kdim
+      call ncapt(cdfout,NCGLOBAL,'kmax',NCLONG,1,ival,rcode)
+      call ncapt(cdfout,NCGLOBAL,'time_start',NCFLOAT,1,start,rcode)
+      call ncapt(cdfout,NCGLOBAL,'time_stop',NCFLOAT,1,stop,rcode)
+      call ncapt(cdfout,NCGLOBAL,'time_step',NCFLOAT,1,delt,rcode)
+      call ncapt(cdfout,NCGLOBAL,'diloc',NCLONG,1,diloc,rcode)
+      call ncapt(cdfout,NCGLOBAL,'djloc',NCLONG,1,djloc,rcode)
+      call ncapt(cdfout,NCGLOBAL,'dkloc',NCLONG,1,dkloc,rcode)
+
+      call ncendf(cdfout,rcode)
+c 
+c build the axes
+c
+      xu=dx*float(diloc-1)
+      xw=xu+0.5*dx
+      yv=dy*float(djloc-1)
+      yu=yv+0.5*dy
+      zw=dz*float(kdim-dkloc+1)
+      zu=zw-0.5*dz
+      x=idim*dx/2
+      y=jdim*dy/2
+      do i=1,kdim
+#if defined(RADTOP) || defined(HBOT)
+         zzu(i)=dz*float(i-1)+dz*0.5
+         zzw(i)=dz*float(i)
+#else
+         zzu(i)=dz*float(kdim-i)+dz*0.5
+         zzw(i)=dz*float(kdim-i+1)
+#endif
+      enddo
+#if defined(RADTOP) || defined(HBOT)
+      zzw(kdim1)=dz*kdim1
+#else
+      zzw(kdim1)=0.0
+#endif
+c
+c load the axes variable values
+c
+      call ncvpt(cdfout, xuid, 1, 1, xu, rcode)
+      call ncvpt(cdfout, xwid, 1, 1, xw, rcode)
+      call ncvpt(cdfout, yuid, 1, 1, yu, rcode)
+      call ncvpt(cdfout, yvid, 1, 1, yv, rcode)
+      call ncvpt(cdfout, zuid, 1, 1, zu, rcode)
+      call ncvpt(cdfout, zwid, 1, 1, zw, rcode)
+      call ncvpt(cdfout,  xid, 1, 1, x, rcode)
+      call ncvpt(cdfout,  yid, 1, 1, y, rcode)
+      call ncvpt(cdfout,  zid, 1, 1, 0., rcode)
+      call ncvpt(cdfout,zzuid, 1,kdim, zzu, rcode)
+      call ncvpt(cdfout,zzwid, 1,kdim1, zzw, rcode)
+c 
+      call ncsnc(cdfout, rcode)
+c
+#if defined(ANALY)
+      do k=1,kdim
+        uf_ave(k)=0.0
+        vf_ave(k)=0.0
+        wf_ave(k)=0.0
+        a_ave(k)=0.0
+        b_ave(k)=0.0
+        p_ave(k)=0.0
+        sg_ave(k)=0.0
+        sd_ave(k)=0.0
+        u2_ave(k) = 0.0
+        v2_ave(k) = 0.0
+        w2_ave(k) = 0.0
+        tke_ave(k) = 0.0
+        dpea(k) = 0.0
+      enddo
+#endif
+c
+      return
+      end

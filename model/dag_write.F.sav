@@ -1,0 +1,1367 @@
+      subroutine dag_write(n,nerr)
+c
+c   $Id: dag_write.F,v 1.12 1999/08/16 20:22:31 eds Exp $
+c
+#if defined(USEMPI)
+      include 'mpif.h'
+#endif
+#include "param.inc"
+#include "olemf.inc"
+#include "olemp.inc"
+#include "olemtke.inc"
+#include "olemcdf.inc"
+#include "netcdf.inc"
+#include "cyclic.inc"
+#include "communicate.inc"
+c 
+#include "moddef.inc"
+c 
+      integer time,strtt(4),countt(4),countu(4),countw(4)
+      integer n,k,nerr,rcode,ix,kx,jx,i,j
+#if defined(USEMPI)
+      integer ierr
+      real*8 pew
+#endif
+      logical first
+      real zi,q,qs,beta,ws,ts,thbar,salbar,sigthta,s
+      real ustar,tau,rainfall,buf(11)
+      real la, S0,tave1(kdim),kmave(kdim1),w2ave(kdim1)
+      real tave(kdim1),salave(kdim1),rhopave(kdim1)
+      real uaved(0:kdim1),vaved(0:kdim1)
+      real sig0,sig1,sig2,zz,urt,urb
+      real*8 ep,ept,pe,pet
+      real rr(kdim),z,pes,pets,z1
+      real pews
+      real*8 uwave(kdim1),vwave(kdim1),udif,vdif
+#if defined(BACKPE)
+      real rhotot(0:idim1,0:jtotal1,0:kdim1)
+      real rhoin(idim*jtotal*kdim)
+      integer indr(idim*jtotal*kdim),nn
+#endif
+      real rtemp(0:idim1,0:jdim1,0:kdim1)
+#if defined(cray)
+      real darea,area,dave
+      real ave(kdim1)
+#if defined(USEMPI)
+      real sd(kdim),sd1(kdim1)
+#endif
+#else
+      real*8 darea,area,dave
+      real*8 ave(kdim1)
+#if defined(USEMPI)
+      real*8 sd(kdim),sd1(kdim1)
+#endif
+#endif
+      integer indx(kdim)
+c
+      data countt/1,1,1,1/
+      data countu/1,1,1,1/
+      data countw/1,1,1,1/
+      data strtt/1,1,1,1/
+      data first/.true./
+c
+      countu(3)=kdim
+      countw(3)=kdim1
+c
+c write output fields
+c 
+      if(iope) then
+        time=n*delt
+        if(first)then
+           first=.false.
+           tindext = 1
+           strtt(4) = 1
+           call ncvpt(timid, ttid, 1, 1, time,rcode)
+        else
+           tindext = tindext + 1
+           strtt(4)=tindext
+           call ncvpt(timid, ttid, tindext, 1, time, rcode)
+        endif
+      endif
+      ix=diloc
+      jx=djloc
+      kx=dkloc
+c
+c u (actually um)
+c
+#if defined(USEMPI)
+      call collect_point(ix,jx,kx,buf)
+#else
+      buf(1) = um(ix,jx,kx)
+      buf(2) = vm(ix,jx,kx)
+      buf(3) = wm(ix,jx,kx)
+      buf(4) = p(ix,jx,kx)
+      buf(5) = th(ix,jx,kx)
+      buf(6) = sal(ix,jx,kx)
+      buf(7) = tke(ix,jx,kx)
+      buf(8) = kheat(ix,jx,kx)
+      buf(9) = kmom(ix,jx,kx)
+      buf(10) = rhop(ix,jx,kx)
+      buf(11) = trc(ix,jx,kx,1)
+#endif
+      if(iope) then
+        write(*,*)"Starting dag_write "
+        call ncvpt(timid,utid,strtt,countt,buf(1),rcode)
+c
+c v (actually vm)
+c
+        call ncvpt(timid,vtid,strtt,countt,buf(2),rcode)
+c
+c w (actually wm)
+c
+        call ncvpt(timid,wtid,strtt,countt,buf(3),rcode) 
+c
+c p_p
+c
+        call ncvpt(timid,ptid,strtt,countt,buf(4),rcode)
+c
+c t
+c
+        call ncvpt(timid,thtid,strtt,countt,buf(5),rcode)
+c
+c s
+c
+        call ncvpt(timid,saltid,strtt,countt,buf(6),rcode)
+c
+c tke*tke
+c
+        call ncvpt(timid,tketid,strtt,countt,buf(7),rcode)
+c
+c kh
+c
+        call ncvpt(timid,khtid,strtt,countt,buf(8),rcode)
+c
+c km
+c
+        call ncvpt(timid,kmtid,strtt,countt,buf(9),rcode)
+c
+c rho_p
+c
+        call ncvpt(timid,rho_ptid,strtt,countt,buf(10),rcode)
+c
+c trcr (only output 1 at this time, needs modification if more than
+c one tracer is examined)
+c
+        do 20 k=1,ntrace
+           call ncvpt(timid,trcrtid(k),strtt,countt,buf(11),rcode)
+ 20     continue
+      endif
+      write(*,*)"Dag write done with points ",my_pe
+c
+c zi, have to do this over all processers because of averaging
+c
+      call zmixed(zi)
+      write(*,*)"Done with zmixed ",my_pe
+      if(iope) then
+        call ncvpt(timid,zitid,strtt,countt,zi,rcode)
+        write(*,*)"Starting calcs",rho0,heatf
+c
+c compute w_star, u_star, t_star, q, rainfall
+c these are from j=1 on the mastertask
+
+        q=0.0
+        j=1
+        do 30 i=1,idim
+           q=q+heatf*randn(i,j)
+ 30     continue
+        q=q/float(idim)
+c
+        qs=-q/(cp*rho0)
+c
+        s=sal(1,j,kdim)
+        write(*,*)"calling sigthta",zi,qs,grav,s,th(1,j,kdim)
+        beta=-(sigthta(s,th(1,j,kdim)+0.001,0.0) - 
+     *       sigthta(s,th(1,j,kdim),0.0))/(0.001*rho0)
+        write(*,*)"beta,qs ",beta,qs
+c
+        if(beta.le.0 .or. qs.le.0)then
+           ws=1.
+           ts=1.
+        else
+           ws=(beta*grav*zi*qs)**0.3333333
+           if(ws.ne.0.0) then
+             ts=qs/ws
+           endif
+        endif
+        write(*,*)"Computed ws,ts", waveamp,wavelen,rho0
+        tau = sqrt(ustr**2 + vstr**2)
+        ustar = sqrt(tau/rho0)
+#if defined(STOKES)
+c
+c compute S0 and La (without km term)
+c
+        S0 = 0.5*((3.14159*waveamp/wavelen)**2)*sqrt(1.561*wavelen)
+        if(tau .eq. 0.0) then
+           La = 0.0
+        else
+           La = (6.283185/(wavelen*ustar))**1.5/sqrt(S0/ustar)
+        endif
+#endif
+        write(*,*)"Computed La "
+c
+        if(rainon)rainfall = 3600.0*rainf*1000.0
+c
+c w_star
+c
+        call ncvpt(timid,w_startid,strtt,countt,ws,rcode)
+c
+c u_star
+c
+        call ncvpt(timid,u_startid,strtt,countt,ustar,rcode)
+c
+c t_star
+c
+        call ncvpt(timid,t_startid,strtt,countt,ts,rcode)
+c
+        write(*,*)"Output star vars"
+c
+c q
+c
+        call ncvpt(timid,qtid,strtt,countt,q,rcode)
+c
+c hf_top
+c
+        if(heaton) call ncvpt(timid,hf_toptid,strtt,countt,
+     *     heatf,rcode)
+c
+c ustr_t
+c
+        if(uston) call ncvpt(timid,ustr_ttid,strtt,countt,
+     *     ustr,rcode)
+c
+c vstr_t
+c
+        if(vston) call ncvpt(timid,vstr_ttid,strtt,countt,
+     *     vstr,rcode)
+c
+c swf_top
+c
+        if(swheaton) call ncvpt(timid,swf_toptid,strtt,countt,
+     *     swheatf,rcode)
+c
+c rain
+c
+        if(rainon) call ncvpt(timid,raintid,strtt,countt,
+     *     rainfall,rcode)
+c
+c lhf_top
+c
+        if(lheaton) call ncvpt(timid,lhf_toptid,strtt,countt,
+     *     latent,rcode)
+        write(*,*)"Output lhf_top "
+c
+#if defined(STOKES)
+c
+c wave_l
+c
+        if(wavelon) call ncvpt(timid,wave_ltid,strtt,countt,
+     *     wavelen,rcode)
+c
+c wave_h
+c
+        if(wavehon) call ncvpt(timid,wave_htid,strtt,countt,
+     *     waveamp,rcode)
+c
+c w_angle
+c
+        if(angleon) call ncvpt(timid,w_angletid,strtt,countt,
+     *     waveang,rcode)
+#endif
+      endif
+      write(*,*)"Dag write done with fluxes ",my_pe
+#if defined(USEMPI)
+      call MPI_BARRIER(MPI_COMM_WORLD,ierr)
+#endif
+c
+c t_bar
+c
+      write(*,*)"Dag write doing with Tbar ",my_pe
+      call intg(th,thbar)
+      if(iope) then
+        call ncvpt(timid,t_bartid,strtt,countt,thbar,rcode)
+      endif
+c
+c s_bar
+c
+      write(*,*)"Dag write doing sbar ",my_pe
+#if defined(SNGLSALT)
+      call intg(sal,salbar)
+#else
+      call intgdp(sal,salbar)
+#endif
+      if(iope) then
+        call ncvpt(timid,s_bartid,strtt,countt,salbar,rcode)
+      endif
+c
+c write the horizontal average fields
+c
+      write(*,*)"Dag_write starting averages ",my_pe
+      area=idim*jtotal
+      darea = area*dble(ndiag)
+      if(iope) then
+        write(*,*) "Starting averages in dag_write"
+      endif
+c
+c t_ave
+c
+      call horzavg(th,tave)
+c
+      if(iope) then
+        call ncvpt(timid,t_avetid,strtt,countu,tave,rcode)
+      endif
+c
+c t2_ave
+c
+      do k=1,kdim
+         dave=0.0
+         do j=1,jdim
+            do i=1,idim
+               dave=dave+(th(i,j,k)-tave(k))**2
+            enddo
+         enddo
+         ave(k)=dave
+      enddo
+c
+#if defined(USEMPI) 
+      call MPI_REDUCE(ave,sd,kdim,
+     &        MPI_DOUBLE_PRECISION,MPI_SUM,mastertask,
+     &        MPI_COMM_WORLD, ierr)
+      if(iope) then
+        do k=1,kdim
+          tave1(k) = sd(k)/area
+        enddo
+      endif
+#else
+      do k=1,kdim
+         tave1(k)= ave(k)/area
+      enddo
+#endif
+
+      if(iope) then
+        call ncvpt(timid,t2_avetid,strtt,countu,tave1,rcode)
+      endif
+c
+c s_ave
+c
+#if defined(SNGLSALT)
+      call horzavg(sal,salave)
+#else
+      call horzavgdp(sal,salave)
+#endif
+c
+      if(iope) then
+        call ncvpt(timid,s_avetid,strtt,countu,salave,rcode)
+      endif
+c
+c s2_ave
+c
+      do k=1,kdim
+         dave=0.0
+         do j=1,jdim
+            do i=1,idim
+               dave=dave+(sal(i,j,k)-salave(k))**2
+            enddo
+         enddo
+         ave(k)=dave
+      enddo
+#if defined(USEMPI)
+      call MPI_REDUCE(ave,sd,kdim,
+     &        MPI_DOUBLE_PRECISION,MPI_SUM,mastertask,
+     &        MPI_COMM_WORLD, ierr)
+      if(iope) then
+        do k=1,kdim
+          tave1(k) = sd(k)/area
+        enddo
+      endif
+#else
+      do k=1,kdim
+         tave1(k) = ave(k)/area
+      enddo
+#endif
+c
+      if(iope) then
+        call ncvpt(timid,s2_avetid,strtt,countu,tave1,rcode)
+      endif
+c
+c tke_ave
+c
+      do k=1,kdim
+         ave(k) = 0.5*(u2_ave(k)+v2_ave(k)+w2_ave(k))
+      enddo
+c
+#if defined(USEMPI)
+      call MPI_REDUCE(ave,sd,kdim,
+     &        MPI_DOUBLE_PRECISION,MPI_SUM,mastertask,
+     &        MPI_COMM_WORLD, ierr)
+      if(iope) then
+        do k=1,kdim
+          tave1(k) = sd(k)/darea
+        enddo
+      endif
+#else
+      do k=1,kdim
+         tave1(k) = ave(k)/darea
+      enddo
+#endif
+c
+      if(iope) then
+        call ncvpt(timid,tke_avetid,strtt,countu,tave1,rcode)
+      endif
+c
+c km_ave 
+c
+      call horzavg(kmom,kmave)
+c
+      if(iope) then
+        call ncvpt(timid,km_avetid,strtt,countu,kmave,rcode)
+c
+#if defined(STOKES)
+c
+c S_0
+c
+        call ncvpt(timid,S_0tid,strtt,countt,S0,rcode)
+c
+c L_a, add kmom term
+c
+        La = La*ave(kdim)**1.5
+        call ncvpt(timid,L_atid,strtt,countt,La,rcode)
+#endif
+      endif
+c
+c w2_ave
+c
+c      do k=1,kdim1
+c         dave=0.0
+c         do j=1,jdim
+c            do i=1,idim
+c               dave=dave+wm(i,j,k)*wm(i,j,k)
+c            enddo
+c         enddo
+c         ave(k)=dave
+c      enddo
+      w2_ave(kdim1) = 0.0
+#if defined(USEMPI)
+      call MPI_REDUCE(w2_ave,sd1,kdim1,
+     &        MPI_DOUBLE_PRECISION,MPI_SUM,mastertask,
+     &        MPI_COMM_WORLD, ierr)
+      if(iope) then
+        do k=1,kdim1
+          w2ave(k) = sd1(k)/darea
+        enddo
+      endif
+#else
+      do k=1,kdim1
+         w2ave(k)= w2_ave(k)/darea
+      enddo
+#endif
+c
+      if(iope) then
+        call ncvpt(timid,w2_avetid,strtt,countw,w2ave,rcode)
+      endif
+c
+c KE_ave
+c
+c
+c compute wm*,  place in thp as a temporary array
+c
+      do k=1,kdim
+         do j=1,jdim
+            do i=1,idim
+               thp(i,j,k)=0.5*(wm(i,j,k)+wm(i,j,k+1))
+            enddo
+         enddo
+      enddo
+c
+      do k=1,kdim
+         dave=0.0
+         do j=1,jdim
+            do i=1,idim
+               dave=dave+um(i,j,k)*um(i,j,k)+
+     *              vm(i,j,k)*vm(i,j,k)+0.5*(wm(i,j,k)*wm(i,j,k)+
+     *              wm(i,j,k+1)*wm(i,j,k+1))
+            enddo
+         enddo
+         ave(k)=0.5*dave
+      enddo
+#if defined(USEMPI)
+      call MPI_REDUCE(ave,sd,kdim,
+     &        MPI_DOUBLE_PRECISION,MPI_SUM,mastertask,
+     &        MPI_COMM_WORLD, ierr)
+      if(iope) then
+        do k=1,kdim
+          tave1(k) = sd(k)/area
+        enddo
+      endif
+#else
+      do k=1,kdim
+         tave1(k) = ave(k)/area
+      enddo
+#endif
+c
+      if(iope) then
+        call ncvpt(timid,KE_avetid,strtt,countu,tave1,rcode)
+      endif
+
+c
+c wt_ave
+c
+      do k=1,kdim
+         dave=0.0
+         do j=1,jdim
+            do i=1,idim
+               dave=dave+thp(i,j,k)*(th(i,j,k)-tave(k))
+            enddo
+         enddo
+         ave(k)=dave
+      enddo
+#if defined(USEMPI)
+      call MPI_REDUCE(ave,sd,kdim,
+     &        MPI_DOUBLE_PRECISION,MPI_SUM,mastertask,
+     &        MPI_COMM_WORLD, ierr)
+      if(iope) then
+        do k=1,kdim
+          tave1(k) = sd(k)/area
+        enddo
+      endif
+#else
+      do k=1,kdim
+         tave1(k)=ave(k)/area
+      enddo
+#endif
+c
+      if(iope) then
+        call ncvpt(timid,wt_avetid,strtt,countu,tave1,rcode)
+      endif
+c
+c ws_ave
+c
+      do k=1,kdim
+         dave=0.0
+         do j=1,jdim
+            do i=1,idim
+               dave=dave+thp(i,j,k)*(sal(i,j,k)-salave(k))
+            enddo
+         enddo
+         ave(k)=dave
+      enddo
+#if defined(USEMPI)
+      call MPI_REDUCE(ave,sd,kdim,
+     &        MPI_DOUBLE_PRECISION,MPI_SUM,mastertask,
+     &        MPI_COMM_WORLD, ierr)
+      if(iope) then
+        do k=1,kdim
+          tave(k) = sd(k)/area
+        enddo
+      endif
+#else
+      do k=1,kdim
+         tave(k) = ave(k)/area
+      enddo
+#endif
+c
+      if(iope) then
+        call ncvpt(timid,ws_avetid,strtt,countu,tave,rcode)
+      endif
+#if !defined(BACKPE)
+c
+c wp_ave at k=bottom
+c
+         dave=0.0
+         do j=1,jdim
+            do i=1,idim
+               dave=dave+thp(i,j,1)*p(i,j,1)
+            enddo
+         enddo
+#if defined(USEMPI)
+      call MPI_REDUCE(dave,pew,1,
+     &        MPI_DOUBLE_PRECISION,MPI_SUM,mastertask,
+     &        MPI_COMM_WORLD, ierr)
+      if(iope) then
+        pews = pew/area
+      endif
+#else
+      pews = dave/area
+#endif
+c
+      if(iope) then
+        call ncvpt(timid,pewtid,strtt,countt,pews,rcode)
+      endif
+#endif 
+c
+c wrho_ave
+c
+      call horzavg(rhop,rhopave)
+c
+c      do k=1,kdim
+c         dave=0.0
+c         do j=1,jdim
+c            do i=1,idim
+c		dave=dave+((rhop(i,j,k+1)+rhop(i,j,k)
+c     *          )*wm(i,j,k+1)-(rhop(i,j,k)+
+c     *          rhop(i,j,k-1))*wm(i,j,k))*
+c     *         (float(k-1)-0.5)*dz*0.5*odz
+c            enddo
+c         enddo
+c         ave(k)=dave
+c      enddo
+c#if defined(USEMPI)
+c      call MPI_REDUCE(ave,sd,kdim,
+c     &        MPI_DOUBLE_PRECISION,MPI_SUM,mastertask,
+c     &        MPI_COMM_WORLD, ierr)
+c#endif
+c
+      if(iope) then
+        do k=1,kdim
+          tave(k) = dpea(k)/darea
+        enddo
+        call ncvpt(timid,wrho_avetid,strtt,countu,tave,rcode)
+      endif
+c
+c rhop_ave
+c
+      if(iope) then
+c
+        call ncvpt(timid,rhop_avetid,strtt,countu,rhopave,rcode)
+      endif
+c
+c u_ave
+c
+      call horzavg(um,tave)
+      do k=1,kdim
+        uaved(k) = tave(k)
+      enddo
+      uaved(0) = 2.*uaved(1) - uaved(2)
+      uaved(kdim1) = 2*uaved(kdim)-uaved(kdim-1)
+c
+      if(iope) then
+        call ncvpt(timid,u_avetid,strtt,countu,tave,rcode)
+      endif
+c
+c u2_ave
+c
+c      do k=1,kdim
+c         dave=0.0
+c         do j=1,jdim
+c            do i=1,idim
+c               dave=dave+(um(i,j,k)-tave(k))**2
+c            enddo
+c         enddo
+c         ave(k)=dave
+c      enddo
+#if defined(USEMPI)
+      call MPI_REDUCE(u2_ave,ave,kdim,
+     &        MPI_DOUBLE_PRECISION,MPI_SUM,mastertask,
+     &        MPI_COMM_WORLD, ierr)
+      if(iope) then
+        do k=1,kdim
+          tave(k) = ave(k)/darea
+        enddo
+      endif
+#else
+      do k=1,kdim
+         tave(k) = u2_ave(k)/darea
+      enddo
+#endif
+c
+      if(iope) then
+        call ncvpt(timid,u2_avetid,strtt,countu,tave,rcode)
+      endif
+c
+c v_ave
+c
+      call horzavg(vm,tave)
+      do k=1,kdim 
+        vaved(k) = tave(k) 
+      enddo
+      vaved(0) = 2.*vaved(1) - vaved(2)
+      vaved(kdim1) = 2*vaved(kdim)-vaved(kdim-1)
+c
+      if(iope) then
+        call ncvpt(timid,v_avetid,strtt,countu,tave,rcode)
+      endif
+c
+c v2_ave
+c
+c      do k=1,kdim
+c         dave=0.0
+c         do j=1,jdim
+c            do i=1,idim
+c               dave=dave+(vm(i,j,k)-tave(k))**2
+c            enddo
+c         enddo
+c         ave(k)=dave
+c      enddo
+#if defined(USEMPI)
+      call MPI_REDUCE(v2_ave,ave,kdim,
+     &        MPI_DOUBLE_PRECISION,MPI_SUM,mastertask,
+     &        MPI_COMM_WORLD, ierr)
+      if(iope) then
+        do k=1,kdim
+          tave(k) = ave(k)/darea
+        enddo
+      endif
+#else
+      do k=1,kdim
+         tave(k) = v2_ave(k)/darea
+      enddo
+#endif
+c
+      if(iope) then
+        call ncvpt(timid,v2_avetid,strtt,countu,tave,rcode)
+      endif
+c
+c hf_ave
+c
+      do k=1,kdim
+         dave=0.0
+         do j=1,jdim
+            do i=1,idim
+               dave=dave+kheat(i,j,k)*(th(i,j,k+1)-th(i,j,k-1))
+            enddo
+         enddo
+         ave(k)=tdz*dave
+      enddo
+#if defined(USEMPI)
+      call MPI_REDUCE(ave,sd,kdim,
+     &        MPI_DOUBLE_PRECISION,MPI_SUM,mastertask,
+     &        MPI_COMM_WORLD, ierr)
+      if(iope) then
+        do k=1,kdim
+          tave(k) = sd(k)/area
+        enddo
+      endif
+#else
+      do k=1,kdim
+         tave(k) = ave(k)/area
+      enddo
+#endif
+c
+      if(iope) then
+        call ncvpt(timid,hf_avetid,strtt,countu,tave,rcode)
+      endif
+c
+c rhof_ave
+c
+      do k=1,kdim
+         dave=0.0
+         do j=1,jdim
+            do i=1,idim
+               z1 = dz*(k-1)+0.5*dz
+               zz = dz*(kdim-k)+0.5*dz
+c	       sig1 = rhob(k)+rhop(i,j,k)
+c	       sig2 = rhob(k+1)+rhop(i,j,k+1)
+c	       sig0 = rhob(k-1)+rhop(i,j,k-1)
+c	       if(k.eq.kdim) sig2 = sig1+(sig1-sig0)
+c	       if(k.eq.1) sig0 = sig1
+               s = sal(i,j,k)
+	       sig1 = sigthta(s,th(i,j,k),zz)
+               s = sal(i,j,k+1)
+	       sig2 = sigthta(s,th(i,j,k+1),zz+dz)
+               s = sal(i,j,k-1)
+               sig0 = sigthta(s,th(i,j,k-1),zz-dz)
+	       urt = (kheat(i,j,k+1)+kheat(i,j,k))*(sig2-sig1)*0.5
+	       urb = (kheat(i,j,k)+kheat(i,j,k-1))*(sig1-sig0)*0.5
+c	       if(k.eq.kdim) urt = 0.0
+               dave=
+     *           dave+(urt-urb)*odz*odz*z1
+            enddo
+         enddo
+         ave(k)=dave
+      enddo
+#if defined(USEMPI)
+      call MPI_REDUCE(ave,sd,kdim,
+     &        MPI_DOUBLE_PRECISION,MPI_SUM,mastertask,
+     &        MPI_COMM_WORLD, ierr)
+      if(iope) then
+        do k=1,kdim
+          tave(k) = sd(k)/area
+        enddo
+      endif
+#else
+      do k=1,kdim
+         tave(k) = ave(k)/area
+      enddo
+#endif
+c
+      if(iope) then
+        call ncvpt(timid,rhof_avetid,strtt,countu,tave,rcode)
+      endif
+c
+c sf_ave
+c
+      do k=1,kdim
+         dave=0.0
+         do j=1,jdim
+            do i=1,idim
+               dave=dave+kheat(i,j,k)*(sal(i,j,k+1)-sal(i,j,k-1))
+            enddo
+         enddo
+         ave(k)=tdz*dave
+      enddo
+#if defined(USEMPI)
+      call MPI_REDUCE(ave,sd,kdim,
+     &        MPI_DOUBLE_PRECISION,MPI_SUM,mastertask,
+     &        MPI_COMM_WORLD, ierr)
+      if(iope) then
+        do k=1,kdim
+          tave(k) = sd(k)/area
+        enddo
+      endif
+#else
+      do k=1,kdim
+         tave(k) = ave(k)/area
+      enddo
+#endif
+c
+      if(iope) then
+        call ncvpt(timid,sf_avetid,strtt,countu,tave,rcode)
+      endif
+c
+c p2_ave
+c
+      do k=1,kdim
+         dave=0.0
+         do j=1,jdim
+            do i=1,idim
+               dave=dave+p(i,j,k)**2
+            enddo
+         enddo
+         ave(k)=dave
+      enddo
+#if defined(USEMPI)
+      call MPI_REDUCE(ave,sd,kdim,
+     &        MPI_DOUBLE_PRECISION,MPI_SUM,mastertask,
+     &        MPI_COMM_WORLD, ierr)
+      if(iope) then
+        do k=1,kdim
+          tave1(k) = sd(k)/area
+        enddo
+      endif
+#else
+      do k=1,kdim
+         tave1(k) = ave(k)/area
+      enddo
+#endif
+c
+      if(iope) then
+        call ncvpt(timid,p2_avetid,strtt,countu,tave1,rcode)
+      endif
+c
+#if defined(ANALY)
+c
+c uf_ave
+c
+#if defined(USEMPI)
+      call MPI_REDUCE(uf_ave,ave,kdim,
+     &        MPI_DOUBLE_PRECISION,MPI_SUM,mastertask,
+     &        MPI_COMM_WORLD, ierr)
+      if(iope) then
+        do k=1,kdim
+          tave1(k) = ave(k)/darea
+        enddo
+      endif
+#else
+      do k=1,kdim
+         tave1(k) = uf_ave(k)/darea
+      enddo
+#endif
+      if(iope) then
+        call ncvpt(timid,ufilt_avetid,strtt,countu,tave1,rcode)
+      endif
+c
+c vf_ave
+c
+#if defined(USEMPI)
+      call MPI_REDUCE(vf_ave,ave,kdim,
+     &        MPI_DOUBLE_PRECISION,MPI_SUM,mastertask,
+     &        MPI_COMM_WORLD, ierr)
+      if(iope) then
+        do k=1,kdim 
+          tave1(k) = ave(k)/darea 
+        enddo
+      endif
+#else
+      do k=1,kdim
+         tave1(k) = vf_ave(k)/darea
+      enddo
+#endif   
+      if(iope) then 
+        call ncvpt(timid,vfilt_avetid,strtt,countu,tave1,rcode)
+      endif
+c
+c wf_ave
+c
+#if defined(USEMPI)
+      call MPI_REDUCE(wf_ave,ave,kdim,
+     &        MPI_DOUBLE_PRECISION,MPI_SUM,mastertask,
+     &        MPI_COMM_WORLD, ierr)
+      if(iope) then
+        do k=1,kdim 
+          tave1(k) = ave(k)/darea 
+        enddo 
+      endif
+#else
+      do k=1,kdim
+         tave1(k)=wf_ave(k)/darea
+      enddo
+#endif   
+      if(iope) then 
+        call ncvpt(timid,wfilt_avetid,strtt,countu,tave1,rcode)
+      endif
+c
+c disipation rate
+c
+#if defined(USEMPI)
+      call MPI_REDUCE(disp_ave,ave,kdim,
+     &        MPI_DOUBLE_PRECISION,MPI_SUM,mastertask,
+     &        MPI_COMM_WORLD, ierr)
+      if(iope) then
+        do k=1,kdim
+          tave1(k) = ave(k)/darea
+        enddo
+      endif
+#else
+      do k=1,kdim
+         tave1(k) = disp_ave(k)/darea
+      enddo
+#endif
+c
+      if(iope) then
+        call ncvpt(timid,disptid,strtt,countu,tave1,rcode)
+      endif
+c
+c pressure term
+c
+#if defined(USEMPI)
+      call MPI_REDUCE(p_ave,ave,kdim,
+     &        MPI_DOUBLE_PRECISION,MPI_SUM,mastertask,
+     &        MPI_COMM_WORLD, ierr)
+      if(iope) then
+        do k=1,kdim 
+          tave1(k) = ave(k)/darea 
+        enddo 
+      endif
+#else
+      do k=1,kdim
+         tave1(k) = p_ave(k)/darea
+      enddo
+#endif   
+      if(iope) then 
+        call ncvpt(timid,p_avetid,strtt,countu,tave1,rcode)
+      endif
+c
+c total advection term (advection plus shear production)
+c
+#if defined(USEMPI)
+      call MPI_REDUCE(a_ave,ave,kdim,
+     &        MPI_DOUBLE_PRECISION,MPI_SUM,mastertask,
+     &        MPI_COMM_WORLD, ierr)
+      if(iope) then
+        do k=1,kdim
+          tave1(k) = ave(k)/darea
+        enddo
+      endif
+#else
+      do k=1,kdim
+         tave1(k) = a_ave(k)/darea
+      enddo
+#endif
+      if(iope) then
+        call ncvpt(timid,a_avetid,strtt,countu,tave1,rcode)
+      endif
+c
+c buoyancy term
+c
+#if defined(USEMPI)
+      call MPI_REDUCE(b_ave,ave,kdim,
+     &        MPI_DOUBLE_PRECISION,MPI_SUM,mastertask,
+     &        MPI_COMM_WORLD, ierr)
+      if(iope) then
+        do k=1,kdim
+          tave1(k) = ave(k)/darea
+        enddo
+      endif
+#else
+      do k=1,kdim
+         tave1(k) = b_ave(k)/darea
+      enddo
+#endif
+      if(iope) then
+        call ncvpt(timid,b_avetid,strtt,countu,tave1,rcode)
+      endif
+c
+c subgrid term (dissipation plus subgrid transport)
+c
+#if defined(USEMPI)
+      call MPI_REDUCE(sg_ave,ave,kdim,
+     &        MPI_DOUBLE_PRECISION,MPI_SUM,mastertask,
+     &        MPI_COMM_WORLD, ierr)
+      if(iope) then
+        do k=1,kdim
+          tave1(k) = ave(k)/darea
+        enddo
+      endif
+#else
+      do k=1,kdim
+         tave1(k) = sg_ave(k)/darea
+      enddo
+#endif
+      if(iope) then
+        call ncvpt(timid,sg_avetid,strtt,countu,tave1,rcode)
+      endif
+c
+c stokes term (if used)
+c
+#if defined(STOKES)
+#if defined(USEMPI)
+      call MPI_REDUCE(sd_ave,ave,kdim,
+     &        MPI_DOUBLE_PRECISION,MPI_SUM,mastertask,
+     &        MPI_COMM_WORLD, ierr)
+      if(iope) then
+        do k=1,kdim
+          tave1(k) = ave(k)/darea
+        enddo
+      endif
+#else
+      do k=1,kdim
+         tave1(k) = sd_ave(k)/darea
+      enddo
+#endif
+      if(iope) then
+        call ncvpt(timid,sd_avetid,strtt,countu,tave1,rcode)
+      endif
+#endif
+      do k=1,kdim
+        uf_ave(k)=0.0
+        vf_ave(k)=0.0
+        wf_ave(k)=0.0
+        a_ave(k)=0.0
+        b_ave(k)=0.0
+        p_ave(k)=0.0
+        sg_ave(k)=0.0
+        sd_ave(k)=0.0
+        u2_ave(k) = 0.0
+        v2_ave(k) = 0.0
+        w2_ave(k) = 0.0
+        disp_ave(k) = 0.0
+        tke_ave(k) = 0.0
+        dpea(k) = 0.0
+      enddo
+c
+c
+c next compute the shear production term separately
+c
+c     u'w' du/dz + v'w' dv/dz
+c
+c
+      do k=1,kdim
+         uwave(k) = 0.0
+         vwave(k) = 0.0
+         ave(k) = 0.0
+         do j=1,jdim
+            do i=1,idim
+              udif = um(i,j,k)-uaved(k)+um(i,j,k-1)-uaved(k-1)
+              vdif = vm(i,j,k)-vaved(k)+vm(i,j,k-1)-vaved(k-1)
+              uwave(k) = uwave(k)
+     *          + 0.25*udif*(wm(i,j,k)+wm(i-1,j,k))
+              vwave(k) = vwave(k)
+     *          + 0.25*vdif*(wm(i,j,k)+wm(i,j-1,k))
+            enddo
+         enddo
+      enddo
+#if defined(USEMPI)
+      call MPI_REDUCE(uwave,ave,kdim,
+     &            MPI_DOUBLE_PRECISION,MPI_SUM,mastertask,
+     &            MPI_COMM_WORLD, ierr)
+#else
+      do k=1,kdim
+        ave(k) = uwave(k)
+      enddo
+#endif
+
+      if(iope) then
+         do k=1,kdim
+           uwave(k) = ave(k)/area
+         enddo
+      endif
+#if defined(USEMPI)
+      call MPI_REDUCE(vwave,ave,kdim, 
+     &            MPI_DOUBLE_PRECISION,MPI_SUM,mastertask, 
+     &            MPI_COMM_WORLD, ierr) 
+#else
+      do k=1,kdim
+        ave(k) = vwave(k)
+      enddo
+#endif
+      if(iope) then
+        do k=1,kdim
+          vwave(k) = ave(k)/area
+        enddo
+      endif
+c
+c compute the full term
+c
+      if(iope) then
+        uwave(kdim1) = 0.0
+        vwave(kdim1) = 0.0
+c
+        do k=1,kdim
+          ave(k) =   0.5*((uwave(k+1)+uwave(k))*
+     *               (uaved(k+1)-uaved(k-1))*tdz +
+     *               (vwave(k+1)+vwave(k))*
+     *               (vaved(k+1)-vaved(k-1))*tdz)
+        enddo
+c
+c output u'w' and v'w'
+c
+        do k=1,kdim
+          tave(k) = uwave(k)
+        enddo
+        call ncvpt(timid,uw_avetid,strtt,countu,tave,rcode)
+        do k=1,kdim 
+          tave(k) = vwave(k) 
+        enddo
+        call ncvpt(timid,vw_avetid,strtt,countu,tave,rcode)
+c
+c output shear production term
+c
+        do k=1,kdim
+          tave(k) = ave(k)
+        enddo
+        call ncvpt(timid,sp_avetid,strtt,countu,tave,rcode)
+      endif
+c
+c next, do potential energy calculations
+c
+c first compute potential energy of flow with and without reordered 
+c density profiles (column reordering ala Thorpe)
+c
+      ept = 0.0
+      ep = 0.0
+      do j=1,jdim
+        do i=1,idim
+          do k=1,kdim
+            z = dz*(k-1)+0.5*dz
+            zz = dz*(kdim-k)+0.5*dz
+            s = sal(i,j,k)
+            rr(k) = sigthta(s,th(i,j,k),zz)
+            ep = ep+dble(rr(k)*z)
+            rr(k) = -1.*rr(k)
+          enddo
+c
+c next call indexing program to get reordered index
+c
+          call indexx(kdim,rr,indx)
+c
+c calculate p.e. using the reordered density
+c
+          do k=1,kdim
+            z = dz*(k-1)+0.5*dz
+            ept = ept-dble(rr(indx(k))*z)
+          enddo
+        enddo
+      enddo
+c
+c next collect data from processors
+c
+#if defined(USEMPI)
+      call MPI_REDUCE(ept,pet,1,
+     &            MPI_DOUBLE_PRECISION,MPI_SUM,mastertask,
+     &            MPI_COMM_WORLD, ierr)
+
+      call MPI_REDUCE(ep,pe,1,
+     &            MPI_DOUBLE_PRECISION,MPI_SUM,mastertask,
+     &            MPI_COMM_WORLD, ierr)
+#else
+      pet = ept
+      pe = ep
+#endif
+      if(iope) then
+        pet = pet/dble(idim*jtotal*kdim)
+        pe = pe/dble(idim*jtotal*kdim)
+c        pets = pet/dble(sigthta(censal,centhta,0.0))
+c        pes = pe/dble(sigthta(censal,centhta,0.0))
+        pets = pet
+        pes = pe
+        call ncvpt(timid,pettid,strtt,countt,pets,rcode)
+c        
+        call ncvpt(timid,petid,strtt,countt,pes,rcode)
+      endif
+c
+c next, compute base level p.e. by sorting 3-d density field
+c
+c first do node level sorting, then collect at mastertask and
+c finish sort.
+c
+      do i=0,idim1
+        do j=0,jdim1
+          do k=1,kdim
+c            rtemp(i,j,k) = -1.*sigthta(sal(i,j,k),th(i,j,k),0.0)
+             rtemp(i,j,k) = rhop(i,j,k)+rhob(k)-1024.
+          enddo
+	  rtemp(i,j,0) = rtemp(i,j,1)
+	  rtemp(i,j,kdim1) = rtemp(i,j,kdim)
+        enddo
+      enddo
+c
+c output the horizontal average of sigma theta
+c
+c      call horzavg(rtemp,tave)
+c      do k=1,kdim
+c        tave(k) = tave(k)*((k-1)*dz+0.5*dz)
+c      enddo
+c
+      if(iope)then
+         do k=1,kdim
+            tave(k) = dpesg(k)/darea
+         enddo
+         call ncvpt(timid,sig_avetid,strtt,countu,tave,rcode)
+         do k=1,kdim
+            dpesg(k) = 0.0
+         enddo
+      endif
+c
+c set top and bottom boundaries to zero, these points will get sorted 
+c to the top of the index list since all defined densities are negative
+c
+#if defined(BACKPE)
+      call collect_3d(rtemp,rhotot)
+c
+      nn = 1
+      do k=1,kdim
+        do j=1,jtotal
+          do i=1,idim
+            rhoin(nn) = rhotot(i,j,k)
+            nn = nn+1
+          enddo
+        enddo
+      enddo
+      if(iope) then
+        call indexx(kdim*idim*jtotal,rhoin,indr)
+c
+c start index count at 1 since all b.c. points are at the top of the
+c index
+c
+        nn=1
+        pew = 0.0
+        do k=1,kdim
+          z = dz*(k-1)+0.5*dz
+          do j=1,jtotal
+            do i=1,idim
+              pew = pew-dble(z*rhoin(indr(nn)))
+              nn = nn+1
+            enddo
+          enddo
+        enddo
+        pew = pew/dble(idim*jtotal*kdim)
+        pews = pew/dble(sigthta(censal,centhta,0.0))
+c
+c output to dag file
+        call ncvpt(timid,pewtid,strtt,countt,pews,rcode)
+c
+      endif
+#endif
+c
+#endif
+
+c sync the netCDF file
+c
+      if(iope) then
+        call ncsnc(timid, rcode)
+      endif
+      return
+      end
+      subroutine horzavg(phi,avg)
+c
+c compute horizontal average of field phi and return the column
+c 
+c
+#if defined(USEMPI)
+      include 'mpif.h'
+#endif
+#include "param.inc"
+#include "communicate.inc"
+
+      real phi(0:idim1,0:jdim1,0:kdim1)
+      real avg(kdim1)
+      real*8 lavg(kdim1)
+      real*8 locavg(kdim1)
+      integer i,j,k
+#if defined(USEMPI)
+      integer ierr
+#endif
+      do k=1,kdim1
+         locavg(k) = 0.0
+         do j=1,jdim
+            do i=1,idim
+               locavg(k) = locavg(k) + phi(i,j,k)
+            enddo
+         enddo
+      enddo
+#if defined(USEMPI)
+      call MPI_ALLREDUCE(locavg,lavg,kdim1,
+     &        MPI_DOUBLE_PRECISION,MPI_SUM,
+     &        MPI_COMM_WORLD, ierr)
+      if(iope) then
+        do k=1,kdim1
+           avg(k) = lavg(k)/dble(float(idim*jtotal))
+        enddo
+      endif
+#else 
+      do k=1,kdim1
+#if defined(cray)
+         avg(k) = locavg(k)/float(idim*jtotal)
+#else
+         avg(k) = locavg(k)/dble(float(idim*jtotal))
+#endif
+      enddo
+#endif
+      return
+      end
+      subroutine horzavgdp(phi,avg)
+c
+c compute horizontal average of field phi and return the column
+c 
+c
+#if defined(USEMPI)
+      include 'mpif.h'
+#endif
+#include "param.inc"
+#include "communicate.inc"
+
+      real*8 phi(0:idim1,0:jdim1,0:kdim1)
+      real avg(kdim1)
+      real*8 lavg(kdim1)
+      real*8 locavg(kdim1)
+      integer i,j,k
+#if defined(USEMPI)
+      integer ierr
+#endif
+      do k=1,kdim1
+         locavg(k) = 0.0
+         do j=1,jdim
+            do i=1,idim
+               locavg(k) = locavg(k) + phi(i,j,k)
+            enddo
+         enddo
+      enddo
+#if defined(USEMPI)
+      call MPI_ALLREDUCE(locavg,lavg,kdim1,
+     &        MPI_DOUBLE_PRECISION,MPI_SUM,
+     &        MPI_COMM_WORLD, ierr)
+      if(iope) then
+        do k=1,kdim1
+           avg(k) = lavg(k)/dble(float(idim*jtotal))
+        enddo
+      endif
+#else 
+      do k=1,kdim1
+#if defined(cray)
+         avg(k) = locavg(k)/float(idim*jtotal)
+#else
+         avg(k) = locavg(k)/dble(float(idim*jtotal))
+#endif
+      enddo
+#endif
+      return
+      end

@@ -1,0 +1,10 @@
+e openr "w100_10-a_dag.nc"
+e nextr
+e v_ave[t=9]
+plot
+e openr "wave30_10-a_dag.nc"
+C USR: error while parsing input file
+e openr "wave30_10-a_dag.nc"
+C USR: error while parsing input file
+qut
+quit
