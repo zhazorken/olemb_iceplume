@@ -1,0 +1,27 @@
+#!/bin/ksh
+#
+# PBS batch script to run an MPI application
+#
+#PBS -N jocn8
+#PBS -A UOSC0027
+#PBS -l walltime=5:20:00
+#PBS -l select=9:ncpus=36:mpiprocs=36
+#PBS -j oe
+
+#PBS -q economy
+# #PBS -q regular
+# #PBS -q premium
+
+cd /glade/scratch/eds/iceangle
+echo "ocn8.in
+newberg_ovr20n_sch1-a_240_rst.nc
+
+
+newberg_ovr20n_sch1-b" > inputi.scp
+
+
+# run the executable
+
+
+mpiexec_mpt dplace -s 1 ./olem720_ovr20_berg_sch1 > ocn8.out
+

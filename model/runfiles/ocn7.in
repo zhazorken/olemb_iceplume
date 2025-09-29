@@ -1,0 +1,46 @@
+Title
+olem77 sheba case 
+Time (dt, runtime)
+0.15 (s), 15 (min)
+ModelValues (latitude,filtfac)
+55.0, 0.05
+Restart (dumpt)
+15 (min), 1
+Field  (start, stop, dt, nfields) (fields(i),i=1,nfields)
+100.(d), 20 (d), 6000 (min), 5
+u, v, w, t, p_p
+Slab (dt, iloc,jloc,kloc, slabs, number of fields)
+20. (s), 11, 495, 230, all,9
+u,v,w,t,s,tke,dcor,dpres,km
+Slab (dt, iloc,jloc,kloc, slabs, number of fields)
+15.0 (s), 50, 800, 75, all,9
+u,v,w,t,s,tke,dpres,dcor,hf_sgs
+Diagnostic (dt, iloc, jloc, kloc)
+6 (s), 518,400,100
+ModelFlags (advsal, filtord, filtskp, filtvert, anal, rotate, omegay)
+1,  4,  3,  1, 0, 1, 1
+BCFlags  (uselatent,userandom)
+1, 1
+BCValues (stop, ranseed, ranamp, ranoff)
+20.0 (d), -5.0,  0.1, 0.5 (hr)
+SGSFlag (useSGS, useDeardorff, advTKE)
+1, 0, 0
+SGSValue (kmb, khb, nu0)
+1.4e-6 (m2 s-1), 1.0e-7 (m2 s-1), 5.0 (m2 s-1)
+IES80  (thtamin, thtamax, salmin, salmax)
+-1.2, 11.0, 0.0, 31.
+ApproxEOS (approx, linear, potential, cenT, cenS)
+0, 0, 0, 3.0, 20.
+BCForce (cool, latent, ustokes, vstokes, ustress, vstress)
+0.0 (W m-2), 0.0 (W m-2), 0.0 (m s-1),0.0 (m s-1), 0.0(N m-2), 0.0 (N m-2)
+Tracers (ntrace)
+0
+ICValues (zi, ranamp, seed)
+100 (m), 0.03, 35
+ICFlags (userandom)
+0
+RAYLEIGH
+0,6 (s)
+REFFRAME 
+0
+End

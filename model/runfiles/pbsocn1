@@ -1,0 +1,26 @@
+#!/bin/ksh
+#
+# PBS batch script to run an MPI application
+#
+#PBS -N jocn1
+#PBS -A UOSC0027
+#PBS -l walltime=7:30:00
+#PBS -l select=8:ncpus=128:mpiprocs=128
+#PBS -j oe
+
+#PBS -q main
+#PBS -l job_priority=economy
+# #PBS -q regular
+
+cd $SCRATCH/iceangle
+echo "ocn1.in
+leconteAmb_1024x220_ic.nc
+
+
+lecAmb_v_d75w32x8_sed0_04-a" > inputi.scp
+
+
+# run the executable
+
+
+mpiexec -n 1024 -ppn 128 ./olem1024_v_d75w32x8_s0 > ocn1.out
