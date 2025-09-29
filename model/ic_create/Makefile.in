@@ -1,0 +1,147 @@
+%
+%  $Id: Makefile.in,v 4.7 1999/08/16 20:22:32 eds Exp $
+%
+% Makefile for ic_create
+%
+% Model conditional compiliation flags
+%
+%
+% sun        Sun compiler f77
+% cray       Cray f77 environment
+% cf90       Cray fortran90 compiler
+% cmf        Thinking Machines Inc. connection machine compiler
+%
+#ifdef sunMAKE
+CPP=/usr/ccs/lib/cpp
+FC=f77
+MODFLAGS=
+MODCPP=
+LIBS= -L/usr/local/lib -lnetcdf
+%
+% Common sun f77 switches:
+% -u         Undefined variables cause fatal error.
+% -g         Debug.
+% -fast      Fast execution. Optimize for speed.
+% -parallel  Automatic and explicit loop parallelizations.
+% -O4        Auto inline of functions.  Highest optimization.
+% -sb        Produce table information for SourceBrowser
+% -C         includes code for checking array bounds
+% -Usym      Undefine preprocessor symbol
+% -Dsym      Define preprocessor symbol
+%
+FFLAGS= -u
+LNFLAGS=
+CPPFLAGS= $(MODFLAGS) $(MODCPP) -I/usr/local/include -I..
+#endif
+#ifdef sgiMAKE
+NCDIR=/usr/people/ddenbo
+OLEMDIR=/kelvin1/ddenbo/src/olem
+CPP=cc -E
+FC=f77
+MODFLAGS=
+MODCPP=
+LIBS= -L$(NCDIR)/lib -lnetcdf
+%
+% Common sun f77 switches:
+% -u         Undefined variables cause fatal error.
+% -g         Debug.
+% -mips3     R4000
+% -mips4     R10000, R8000, R5000
+% -n32       default for -mips4 and R5000, and -mips3
+% -static    causes all local variables to be static
+% -O2        Turn on extensive optimization.
+% -O3        Turn on aggressive optimization.
+% -Ofast     Fastest optimaization for platform.  -Ofast=ipxx
+% -r5000     Schedule code for R5000
+% -C         includes code for checking array bounds
+% -Usym      Undefine preprocessor symbol
+% -Dsym      Define preprocessor symbol
+%
+FFLAGS= -u -n32
+LNFLAGS=
+CPPFLAGS= $(MODFLAGS) $(MODCPP) -I$(NCDIR)/include -I$(OLEMDIR)
+#endif
+#ifdef win32MAKE
+%
+% CFG=Release (optimized), Debug (Debug version)
+%
+CFG=Debug
+
+CPP=
+FC=f90
+LINK=link
+MODFLAGS=/D Win32 /D OLDSOLVE
+MODCPP=
+LIBS=kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib \
+     advapi32.lib shell32.lib wsock32.lib ole32.lib oleaut32.lib \
+     uuid.lib odbc32.lib odbccp32.lib \
+     /LIBPATH:"C:\\local\\lib" netcdf.lib
+%
+% Common microsoft fortran switches:
+% /Ox       Enables speed optimization and denoted inlining
+% /Ob2      Enables auto inlining
+% /4Yd      Warns about undefined variables
+% /4Yb      Bounds checking
+% /G5       Optimize for Pentium processor
+% /Zi       Produce .obj with symbolic debugging information
+% /c        Supresses linking of compiled objects
+% /nologo   Supresses the copyright message
+% /I "dir"  Adds and include path
+% /Fo"dir"  Names the object
+% /D "sym"  Defines symbol with metacommands
+% /4fps1    Old fortran 77 compiler
+%
+BASE_FFLAGS= /G5 /nologo
+LNFLAGS= /nologo /subsystem:console /incremental:no /machine:I386 \
+     /out:"ic_create.exe" /nodefaultlib:library
+
+CPPFLAGS= $(MODFLAGS) $(MODCPP) /I"C:\local\include" /I"..\\olem"
+
+.IF $(CFG) == Release
+	FFLAGS = $(BASE_FFLAGS) /Ox /Ob2 /D NDEBUG
+.ELSE
+	FFLAGS = $(BASE_FFLAGS) /Zi
+.END
+#endif
+
+SOURCES = ies80.F
+
+MAIN = ic_create.F
+
+OBJECTS= $(SOURCES:.F=.o)
+
+.KEEP_STATE:
+#ifdef sunMAKE
+ic_create: $(OBJECTS) ic_create.o
+	$(FC) $(FFLAGS) -o ic_create ic_create.o $(OBJECTS) $(LIBS)
+#endif
+#ifdef win32MAKE
+ic_create: $(OBJECTS) ic_create.o
+	$(LINK) $(LNFLAGS) *.o $(LIBS)
+#endif
+#ifdef sgiMAKE
+ic_create: $(OBJECTS) ic_create.o
+	$(FC) $(FFLAGS) -o ic_create ic_create.o $(OBJECTS) $(LIBS)
+#endif
+
+PHAKE:
+
+#if !defined(win32MAKE)
+clean:
+	@rm -f .sb/Locked/\*
+	@rm -f .sb/NewRoot/\*
+	@rm -f .sb/OldRoot/\*
+	@rm -f .sb/Refd/\*
+	@rm -f .sb/Index
+	rm -f *.o *~ *.fcm *.f90 *.l *.lst *.T *.pe.dp
+	rm -f .make.state .nse_depinfo .make.depend*
+#else
+clean:
+	@rm -f .sb/Locked/\*
+	@rm -f .sb/NewRoot/\*
+	@rm -f .sb/OldRoot/\*
+	@rm -f .sb/Refd/\*
+	@rm -f .sb/Index
+	rm -f *.o *~ *.for *.fcm *.f90 *.l *.lst *.T *.pe.dp
+	rm -f .make.state .nse_depinfo .make.depend*
+#endif
